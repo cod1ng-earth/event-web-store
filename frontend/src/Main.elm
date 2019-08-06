@@ -14,7 +14,7 @@ import Task
 import Random
 import Http
 import Delay
-import Json.Decode exposing (Decoder, map8, float, string, field, list, decodeString)
+import Json.Decode exposing (Decoder, map3, float, string, field, list, decodeString)
 
 
 type alias Model =
@@ -197,21 +197,11 @@ productsDecoder = list productDecoder
 type alias Product =
   { uuid             : String
   , title            : String
-  , description      : String
-  , longtext         : String
-  , category         : String
-  , smallImageURL    : String
-  , largeImageURL    : String
   , price            : Float
   }
 
 productDecoder : Decoder Product
-productDecoder = map8 Product
+productDecoder = map3 Product
   (field "uuid"          string)
   (field "title"         string)
-  (field "description"   string)
-  (field "longtext"      string)
-  (field "category"      string)
-  (field "smallImageURL" string)
-  (field "largeImageURL" string)
   (field "price"         float)

@@ -18,6 +18,7 @@ import (
 var (
 	offset   int64
 	products map[string]*pb.Product
+	keys     []string
 	mux      sync.Mutex
 )
 
@@ -36,20 +37,21 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
 	//	fmt.Fprintf(w, "offset: %d", offset)
 
-	var keys []string
 	mux.Lock()
-	for k := range products {
-		keys = append(keys, k)
-	}
 	defer mux.Unlock()
-
-	sort.Strings(keys)
+	if keys == nil {
+		for k := range products {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+	}
 
 	var pp []*pb.Product
-	for i, k := range keys {
-		if i > 100 {
-			break
-		}
+	max := 100
+	if len(keys) < max {
+		max = len(keys)
+	}
+	for _, k := range keys[0 : max-1] {
 		pp = append(pp, products[k])
 	}
 	bytes, err := json.Marshal(pp)
@@ -60,24 +62,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("failed to send result: %v", err)
 	}
-
-	//	bytes, err := json.Marshal(keys)
-	//	if err != nil {
-	//		log.Printf("failed to serialize: %v", err)
-	//	}
-	//	_, err = w.Write(bytes)
-	//	if err != nil {
-	//		log.Printf("failed to send result: %v", err)
-	//	}
-
-	//	fmt.Fprintf(w, "{")
-	//	for i, k := range keys {
-	//		fmt.Fprintf(w, "\"%s\"", k)
-	//		if i != len(keys)-1 {
-	//			fmt.Fprintf(w, ",")
-	//		}
-	//	}
-	//	fmt.Fprintf(w, "}")
 }
 
 func processor(msg *sarama.ConsumerMessage) error {
@@ -96,8 +80,14 @@ func processor(msg *sarama.ConsumerMessage) error {
 	defer mux.Unlock()
 	if p.New == nil {
 		delete(products, UUID)
+		keys = nil
 	} else {
-		products[UUID] = p.New
+		products[UUID] = &pb.Product{
+			Uuid:  p.New.Uuid,
+			Title: p.New.Title,
+			Price: p.New.Price,
+		}
+		keys = nil
 	}
 
 	return nil
