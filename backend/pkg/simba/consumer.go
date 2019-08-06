@@ -34,7 +34,7 @@ func (c *Consumer) Start() {
 	for {
 		select {
 		case err := <-c.consumer.Errors():
-			log.Panicf("failure from kafka consumer: %s", err)
+			log.Printf("failure from kafka consumer: %s", err)
 
 		case ntf := <-c.consumer.Notifications():
 			log.Printf("Rebalanced: %+v\n", ntf)
