@@ -22,9 +22,14 @@ var (
 	mux      sync.Mutex
 )
 
-func StartHandler(c *cluster.Consumer) (http.HandlerFunc, func()) {
+func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
 
-	agent := simba.NewConsumer(c, processor)
+	consumer, err := cluster.NewConsumer(*brokers, "catalog-consumer-group", []string{"products"}, cfg)
+	if err != nil {
+		log.Panicf("failed to setup kafka consumer: %s", err)
+	}
+
+	agent := simba.NewConsumer(consumer, processor)
 	go agent.Start()
 
 	offset = 0

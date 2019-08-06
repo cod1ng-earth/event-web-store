@@ -25,36 +25,16 @@ func main() {
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Group.Return.Notifications = true
-	topics := []string{*topic}
-	consumer, err := cluster.NewConsumer(*brokerList, "catalog-consumer-group", topics, config)
-	if err != nil {
-		log.Panicf("failed to setup kafka consumer: %s", err)
-	}
-	defer func() {
-		if err := consumer.Close(); err != nil {
-			log.Panicf("failed to close kafka consumer: %s", err)
-		}
-	}()
-
-	consumer2, err := cluster.NewConsumer(*brokerList, "productdetail-consumer-group", topics, config)
-	if err != nil {
-		log.Panicf("failed to setup kafka consumer: %s", err)
-	}
-	defer func() {
-		if err := consumer2.Close(); err != nil {
-			log.Panicf("failed to close kafka consumer: %s", err)
-		}
-	}()
 
 	log.Println("Hello, world!")
 
-	handler, shutdown := catalog.StartHandler(consumer)
-	defer shutdown()
-	http.HandleFunc("/all-products", handler)
+	catalogHandler, catalogShutdown := catalog.StartHandler(brokerList, config)
+	defer catalogShutdown()
+	http.HandleFunc("/all-products", catalogHandler)
 
-	handler2, shutdown2 := product.StartHandler(consumer2)
-	defer shutdown2()
-	http.HandleFunc("/product", handler2)
+	productHandler, productShutdown := product.StartHandler(brokerList, config)
+	defer productShutdown()
+	http.HandleFunc("/product", productHandler)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()

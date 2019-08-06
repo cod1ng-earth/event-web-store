@@ -48,7 +48,9 @@ func (c *Consumer) Start() {
 
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
-			c.consumer.Close()
+			if err := c.consumer.Close(); err != nil {
+				log.Panicf("failed to close kafka consumer: %s", err)
+			}
 			return
 		}
 	}
