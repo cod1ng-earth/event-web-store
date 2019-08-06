@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	lorem "github.com/drhodes/golorem"
+	"github.com/drhodes/golorem"
 	"github.com/satori/go.uuid"
 )
 

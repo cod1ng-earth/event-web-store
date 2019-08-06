@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/catalog"
 	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	"github.com/bsm/sarama-cluster"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
@@ -35,6 +36,10 @@ func main() {
 	}()
 
 	log.Println("Hello, world!")
+
+	handler, shutdown := catalog.StartHandler(consumer)
+	defer shutdown()
+	http.HandleFunc("/all-products", handler)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()

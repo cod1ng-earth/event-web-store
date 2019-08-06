@@ -11,7 +11,7 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (

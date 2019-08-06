@@ -6,13 +6,15 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events exposing (onVisibilityChange, Visibility(..))
-import Html exposing (Html, button, div, text, h1)
+import Html exposing (Html, button, div, text, h1, ul, li, a)
 import Html.Events exposing (onClick)
+import Html.Attributes exposing (href)
 import Time
 import Task
 import Random
 import Http
 import Delay
+import Json.Decode exposing (Decoder, map8, float, string, field, list, decodeString)
 
 
 type alias Model =
@@ -20,6 +22,8 @@ type alias Model =
     , same : Int
     , text : String
     , out : String
+    , error : String
+    , products : Products
     }
 
 
@@ -29,6 +33,8 @@ init _ =
       , same = 0
       , text = ""
       , out = ""
+      , error = ""
+      , products = []
       }
     , Cmd.batch [ fetchResults ]
     )
@@ -37,10 +43,12 @@ init _ =
 type Msg
     = Increment
     | Decrement
+    | LoadProducts
     | Tick Time.Posix
     | Reload
     | NewFace Int
     | GotText (Result Http.Error String)
+    | GotProducts (Result Http.Error Products)
     | VisibilityChange Browser.Events.Visibility
 
 
@@ -52,6 +60,9 @@ update msg model =
 
         Reload ->
             ( model, fetchResults )
+
+        LoadProducts ->
+            ( model, fetchProducts )
 
         NewFace role ->
             if model.count == role then
@@ -74,7 +85,15 @@ update msg model =
                     ( { model | text = fullText }, Delay.after 500 Delay.Millisecond Reload )
 
                 Err e ->
-                    ( { model | text = toString e }, Delay.after 500 Delay.Millisecond Reload )
+                    ( { model | error = toString e }, Delay.after 500 Delay.Millisecond Reload )
+
+        GotProducts result ->
+            case result of
+                Ok fullText ->
+                    ( { model | products = fullText }, Cmd.none )
+
+                Err e ->
+                    ( { model | error = toString e }, Cmd.none )
         
         VisibilityChange Visible ->
             ( { model | out = "v" }, Cmd.none )
@@ -108,15 +127,26 @@ view model =
     div []
         [ h1 [] [ text "Hello, world." ]
         , div []
-            [ button [ onClick Increment ] [ text "+1" ]
+            [ button [ onClick LoadProducts ] [ text "load products" ]
+            , button [ onClick Increment ] [ text "+1" ]
             , div [] [ text <| String.fromInt model.count ]
             , div [] [ text <| String.fromInt model.same ]
             , button [ onClick Decrement ] [ text "-1" ]
             , div [] [ text model.text ]
             , div [] [ text model.out ]
+            , div [] [ text model.error ]
+            , div [] [ renderProducts model.products ]
             ]
         ]
 
+renderProducts : Products -> Html msg
+renderProducts lst =
+    ul []
+        (List.map (\l -> li [] [ renderProduct l ]) lst )
+
+renderProduct : Product  -> Html msg
+renderProduct product =
+    a [ href ("/product/" ++ product.uuid) ] [text product.title]
 
 roll : Random.Generator Int
 roll =
@@ -128,6 +158,14 @@ fetchResults =
     Http.get
         { url = "http://localhost:8080/foobarbaz"
         , expect = Http.expectString GotText
+        }
+
+
+fetchProducts : Cmd Msg
+fetchProducts =
+    Http.get
+        { url = "http://localhost:8080/all-products"
+        , expect = Http.expectJson GotProducts productsDecoder
         }
 
 
@@ -150,3 +188,30 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
+
+type alias Products = List Product
+
+productsDecoder : Decoder Products
+productsDecoder = list productDecoder
+
+type alias Product =
+  { uuid             : String
+  , title            : String
+  , description      : String
+  , longtext         : String
+  , category         : String
+  , smallImageURL    : String
+  , largeImageURL    : String
+  , price            : Float
+  }
+
+productDecoder : Decoder Product
+productDecoder = map8 Product
+  (field "uuid"          string)
+  (field "title"         string)
+  (field "description"   string)
+  (field "longtext"      string)
+  (field "category"      string)
+  (field "smallImageURL" string)
+  (field "largeImageURL" string)
+  (field "price"         float)
