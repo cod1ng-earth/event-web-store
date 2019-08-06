@@ -46,18 +46,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sort.Strings(keys)
 	}
 
-	var pp []*pb.Product
 	max := 100
 	if len(keys) < max {
 		max = len(keys)
 	}
-	for _, k := range keys[0 : max-1] {
-		pp = append(pp, products[k])
+	var pp []*pb.Product = make([]*pb.Product, max-1)
+	for i, k := range keys[0 : max-1] {
+		pp[i] = products[k]
 	}
+
 	bytes, err := json.Marshal(pp)
 	if err != nil {
 		log.Printf("failed to serialize: %v", err)
 	}
+
 	_, err = w.Write(bytes)
 	if err != nil {
 		log.Printf("failed to send result: %v", err)

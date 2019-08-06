@@ -18,89 +18,38 @@ import Json.Decode exposing (Decoder, map3, float, string, field, list, decodeSt
 
 
 type alias Model =
-    { count : Int
-    , same : Int
-    , text : String
-    , out : String
-    , error : String
+    { error : String
     , products : Products
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { count = 0
-      , same = 0
-      , text = ""
-      , out = ""
-      , error = ""
+    ( { error = ""
       , products = []
       }
-    , Cmd.batch [ fetchResults ]
+    , Cmd.batch [ fetchProducts ]
     )
 
 
 type Msg
-    = Increment
-    | Decrement
-    | LoadProducts
-    | Tick Time.Posix
-    | Reload
-    | NewFace Int
-    | GotText (Result Http.Error String)
+    = LoadProducts
     | GotProducts (Result Http.Error Products)
-    | VisibilityChange Browser.Events.Visibility
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Tick _ ->
-            ( model, Random.generate NewFace roll )
-
-        Reload ->
-            ( model, fetchResults )
-
         LoadProducts ->
             ( model, fetchProducts )
-
-        NewFace role ->
-            if model.count == role then
-                ( { model | same = model.same + 1 }, Cmd.none )
-            else
-                ( { model | count = role }, Cmd.none )
-
-        Increment ->
-            ( { model | count = model.count + 1 }, Cmd.none )
-
-        Decrement ->
-            if model.count > 0 then
-                ( { model | count = model.count - 1 }, Cmd.none )
-            else
-                ( model, Cmd.none )
-
-        GotText result ->
-            case result of
-                Ok fullText ->
-                    ( { model | text = fullText }, Delay.after 500 Delay.Millisecond Reload )
-
-                Err e ->
-                    ( { model | error = toString e }, Delay.after 500 Delay.Millisecond Reload )
 
         GotProducts result ->
             case result of
                 Ok fullText ->
-                    ( { model | products = fullText }, Cmd.none )
+                    ( { model | products = fullText, error = "" }, Cmd.none )
 
                 Err e ->
                     ( { model | error = toString e }, Cmd.none )
-        
-        VisibilityChange Visible ->
-            ( { model | out = "v" }, Cmd.none )
-
-        VisibilityChange Hidden ->
-            ( { model | out = "h" }, Cmd.none )
-
 
 
 toString : Http.Error -> String
@@ -128,12 +77,6 @@ view model =
         [ h1 [] [ text "Hello, world." ]
         , div []
             [ button [ onClick LoadProducts ] [ text "load products" ]
-            , button [ onClick Increment ] [ text "+1" ]
-            , div [] [ text <| String.fromInt model.count ]
-            , div [] [ text <| String.fromInt model.same ]
-            , button [ onClick Decrement ] [ text "-1" ]
-            , div [] [ text model.text ]
-            , div [] [ text model.out ]
             , div [] [ text model.error ]
             , div [] [ renderProducts model.products ]
             ]
@@ -148,18 +91,6 @@ renderProduct : Product  -> Html msg
 renderProduct product =
     a [ href ("/product/" ++ product.uuid) ] [text product.title]
 
-roll : Random.Generator Int
-roll =
-    Random.int 1 6
-
-
-fetchResults : Cmd Msg
-fetchResults =
-    Http.get
-        { url = "http://localhost:8080/foobarbaz"
-        , expect = Http.expectString GotText
-        }
-
 
 fetchProducts : Cmd Msg
 fetchProducts =
@@ -170,15 +101,7 @@ fetchProducts =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.batch
-        [ Time.every 1000 Tick
-        -- , Time.every 2000 Reload
-        , onVisibilityChange abc
-        ]
-
-abc : Browser.Events.Visibility -> Msg
-abc visibility = VisibilityChange visibility
+subscriptions _ = Sub.batch []
 
 main : Program () Model Msg
 main =
