@@ -6,7 +6,7 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events exposing (onVisibilityChange, Visibility(..))
-import Html exposing (Html, button, div, text, h1, ul, li, a)
+import Html exposing (Html, button, div, text, h1, ol, ul, li, a)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (href)
 import Time
@@ -14,42 +14,75 @@ import Task
 import Random
 import Http
 import Delay
-import Json.Decode exposing (Decoder, map3, float, string, field, list, decodeString)
+import Json.Decode exposing (Decoder, map3, map8, float, string, field, list, decodeString)
 
 
 type alias Model =
     { error : String
-    , products : Products
+    , content : Maybe Content
     }
 
+type Content
+  = Products Products
+  | Product ProductDetail
+
+type alias ProductDetail =
+  { uuid:          String
+  , title:         String
+  , description:   String
+  , longtext:      String
+  , category:      String
+  , smallImageURL: String
+  , largeImageURL: String
+  , price:         Float
+  }
+
+type alias Products = List ProductOverview
+type alias ProductOverview =
+  { uuid             : String
+  , title            : String
+  , price            : Float
+  }
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
-      , products = []
+      , content = Nothing
       }
-    , Cmd.batch [ fetchProducts ]
+    , Cmd.batch [ ]
     )
 
 
 type Msg
     = LoadProducts
+    | LoadProduct String
     | GotProducts (Result Http.Error Products)
+    | GotProduct (Result Http.Error ProductDetail)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+
         LoadProducts ->
             ( model, fetchProducts )
 
+        LoadProduct uuid ->
+            ( model, fetchProduct uuid )
+
         GotProducts result ->
             case result of
-                Ok fullText ->
-                    ( { model | products = fullText, error = "" }, Cmd.none )
-
+                Ok pp ->
+                    ( { model | content = Just (Products pp), error = "" }, Cmd.none )
                 Err e ->
-                    ( { model | error = toString e }, Cmd.none )
+                    ( { model | content = Nothing, error = toString e }, Cmd.none )
+
+        GotProduct result ->
+            case result of
+                Ok p ->
+                    ( { model | content = Just (Product p), error = "" }, Cmd.none )
+                Err e ->
+                    ( { model | content = Nothing, error = toString e }, Cmd.none )
 
 
 toString : Http.Error -> String
@@ -77,26 +110,57 @@ view model =
         [ h1 [] [ text "Hello, world." ]
         , div []
             [ button [ onClick LoadProducts ] [ text "load products" ]
+            , button [ onClick (LoadProduct "0002630c-718d-4ffb-8989-a760cdf69c26") ] [ text "load 0002630c-718d-4ffb-8989-a760cdf69c26" ]
             , div [] [ text model.error ]
-            , div [] [ renderProducts model.products ]
+            , div [] [ renderContent model.content ]
             ]
         ]
 
-renderProducts : Products -> Html msg
+renderContent : Maybe Content -> Html Msg
+renderContent content =
+    case content of
+        Just (Products pp) -> renderProducts pp
+        Just (Product p) -> renderProductDetail p
+        Nothing -> text "" 
+
+renderProducts : Products -> Html Msg
 renderProducts lst =
     ul []
         (List.map (\l -> li [] [ renderProduct l ]) lst )
 
-renderProduct : Product  -> Html msg
+renderProduct : ProductOverview  -> Html Msg
 renderProduct product =
-    a [ href ("/product/" ++ product.uuid) ] [text product.title]
+    div []
+            [ button [ onClick (LoadProduct product.uuid) ] [ text "more details!" ]
+            , text product.title
+            ]
 
+
+renderProductDetail : ProductDetail  -> Html msg
+renderProductDetail product =
+    ol []
+    [ li [] [text product.uuid ]
+    , li [] [text product.title ]
+    , li [] [text product.description ]
+    , li [] [text product.longtext ]
+    , li [] [text product.category ]
+    , li [] [text product.smallImageURL ]
+    , li [] [text product.largeImageURL ]
+    , li [] [text (String.fromFloat product.price) ]
+    ]
 
 fetchProducts : Cmd Msg
 fetchProducts =
     Http.get
         { url = "http://localhost:8080/all-products"
         , expect = Http.expectJson GotProducts productsDecoder
+        }
+
+fetchProduct : String -> Cmd Msg
+fetchProduct uuid =
+    Http.get
+        { url = "http://localhost:8080/product?uuid=" ++ uuid
+        , expect = Http.expectJson GotProduct productDetailDecoder
         }
 
 
@@ -112,19 +176,25 @@ main =
         , subscriptions = subscriptions
         }
 
-type alias Products = List Product
 
 productsDecoder : Decoder Products
 productsDecoder = list productDecoder
 
-type alias Product =
-  { uuid             : String
-  , title            : String
-  , price            : Float
-  }
 
-productDecoder : Decoder Product
-productDecoder = map3 Product
+productDecoder : Decoder ProductOverview
+productDecoder = map3 ProductOverview
   (field "uuid"          string)
   (field "title"         string)
+  (field "price"         float)
+
+
+productDetailDecoder : Decoder ProductDetail
+productDetailDecoder = map8 ProductDetail
+  (field "uuid"          string)
+  (field "title"         string)
+  (field "description"   string)
+  (field "longtext"      string)
+  (field "category"      string)
+  (field "smallImageURL" string)
+  (field "largeImageURL" string)
   (field "price"         float)
