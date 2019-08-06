@@ -9,18 +9,21 @@ import Browser.Events exposing (onVisibilityChange, Visibility(..))
 import Html exposing (Html, button, div, text, h1, ol, ul, li, a)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (href, class)
+import List exposing (foldl)
 import Time
 import Task
 import Random
 import Http
 import Delay
-import Json.Decode exposing (Decoder, map3, map8, float, string, field, list, decodeString)
+import Json.Decode exposing (Decoder, map2, map3, map8, int, float, string, field, list, decodeString)
+import Json.Encode
 
 
 type alias Model =
     { error : String
     , content : Maybe Content
     , pageNumber: Int
+    , cart : Cart
     }
 
 type Content
@@ -45,11 +48,28 @@ type alias ProductOverview =
   , price            : Float
   }
 
+type alias Cart = List CartItem
+type alias CartItem =
+  { product: ProductDetail
+  , quantiy: Int
+  }
+
+type alias CartChange =
+  { action: CartAction
+  , uuid: String
+  }
+
+type CartAction
+  = Add
+  | Remove
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
       , content = Nothing
       , pageNumber = 0
+      , cart = []
       }
     , Cmd.batch [ fetchProducts 0 ]
     )
@@ -60,8 +80,10 @@ type Msg
     | LoadProduct String
     | PreviousPage
     | NextPage
+    | AddToCart String
     | GotProducts (Result Http.Error Products)
     | GotProduct (Result Http.Error ProductDetail)
+    | AddedToCart (Result Http.Error Cart)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -80,6 +102,9 @@ update msg model =
         NextPage ->
             ( {model | pageNumber = model.pageNumber + 1}, fetchProducts (model.pageNumber + 1) )
 
+        AddToCart uuid ->
+            ( model, addToCart (CartChange Add uuid) )
+
         GotProducts result ->
             case result of
                 Ok pp ->
@@ -93,6 +118,13 @@ update msg model =
                     ( { model | content = Just (Product p), error = "" }, Cmd.none )
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
+
+        AddedToCart result ->
+            case result of
+                Ok c ->
+                    ( { model | cart = c, error = "" }, Cmd.none )
+                Err e ->
+                    ( { model | cart = [], error = toString e }, Cmd.none )
 
 
 toString : Http.Error -> String
@@ -120,10 +152,19 @@ view model =
         [ h1 [ class "dings" ] [ text "Hello, world." ]
         , div []
             [ button [ onClick LoadProducts ] [ text "show products" ]
+            , div [] [ renderCart model.cart ]
             , div [] [ text model.error ]
             , div [] [ renderContent model ]
             ]
         ]
+
+renderCart : Cart -> Html msg
+renderCart cart =
+    text ((String.fromInt (itemsInCart cart)) ++ " items in the cart")
+
+itemsInCart : Cart -> Int
+itemsInCart cart =
+    foldl (+) 0 (List.map (\e -> 1) cart)
 
 renderContent : Model -> Html Msg
 renderContent model =
@@ -145,11 +186,13 @@ renderProduct : ProductOverview  -> Html Msg
 renderProduct product =
     div []
             [ button [ onClick (LoadProduct product.uuid) ] [ text "more details!" ]
+            , button [ onClick (AddToCart product.uuid) ] [ text "add to cart" ]
+            , text " "
             , text product.title
             ]
 
 
-renderProductDetail : ProductDetail  -> Html msg
+renderProductDetail : ProductDetail  -> Html Msg
 renderProductDetail product =
     ol []
     [ li [] [text product.uuid ]
@@ -160,6 +203,7 @@ renderProductDetail product =
     , li [] [text product.smallImageURL ]
     , li [] [text product.largeImageURL ]
     , li [] [text (String.fromFloat product.price) ]
+    , button [ onClick (AddToCart product.uuid) ] [ text "add to cart" ]
     ]
 
 fetchProducts : Int -> Cmd Msg
@@ -176,6 +220,26 @@ fetchProduct uuid =
         , expect = Http.expectJson GotProduct productDetailDecoder
         }
 
+addToCart : CartChange -> Cmd Msg
+addToCart cartChange =
+    Http.post
+        { url = "http://localhost:8080/cart"
+        , body = Http.jsonBody (encodeCartChange cartChange)
+        , expect = Http.expectJson AddedToCart cartDecoder
+        }
+
+encodeCartChange : CartChange -> Json.Encode.Value
+encodeCartChange cc  =
+    Json.Encode.object
+        [ ( "action", Json.Encode.string (cartActionToString cc.action) )
+        , ( "uuid", Json.Encode.string cc.uuid )
+        ]
+
+cartActionToString : CartAction -> String
+cartActionToString c =
+    case c of
+      Add -> "add"
+      Remove -> "add"
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.batch []
@@ -211,3 +275,12 @@ productDetailDecoder = map8 ProductDetail
   (field "smallImageURL" string)
   (field "largeImageURL" string)
   (field "price"         float)
+
+
+cartDecoder : Decoder Cart
+cartDecoder = list cartItemDecoder
+
+cartItemDecoder : Decoder CartItem
+cartItemDecoder = map2 CartItem
+  (field "product"  productDetailDecoder)
+  (field "quantiy"  int)
