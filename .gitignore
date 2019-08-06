@@ -1,1 +1,5 @@
-collins
+/api
+/csv-fake-alternate
+/csv-fake-create
+/csv-import
+/backend/vendor
