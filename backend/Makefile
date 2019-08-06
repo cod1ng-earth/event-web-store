@@ -15,3 +15,9 @@ products-1.csv:
 
 products-2.csv: products-1.csv
 	cat products-1.csv | go run ./cmd/csv-fake-alternate/main.go > products-2.csv
+
+lint:
+	golangci-lint run -e ./vendor ./...
+
+pkg/pb/products.pb.go: pkg/pb/products.proto
+	protoc --go_out=. pkg/pb/products.proto

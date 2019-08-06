@@ -8,8 +8,8 @@ import (
 	"os"
 	"strconv"
 
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
-	"github.com/damoon/eventstore-example/pkg/pb"
 	"github.com/golang/protobuf/proto"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )

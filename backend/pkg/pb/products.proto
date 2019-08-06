@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package pb;
+
+message Product {
+    string uuid = 1;
+    string title = 2;
+    string description = 3;
+    string longtext = 4;
+    string category = 8;
+    string smallImageURL = 5;
+    string largeImageURL = 6;
+    float price = 7;
+}
+
+message ProductUpdate {
+    Product old = 1;
+    Product new = 2;
+}
