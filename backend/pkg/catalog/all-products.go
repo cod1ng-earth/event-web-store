@@ -50,8 +50,6 @@ func (a ProductsByPrice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ProductsByPrice) Less(i, j int) bool { return a[i].Price < a[j].Price }
 
 func GetProductsByUUID() []*pb.Product {
-	mux.Lock()
-	defer mux.Unlock()
 	if productsByUUID == nil {
 		for _, v := range products {
 			productsByUUID = append(productsByUUID, v)
@@ -62,8 +60,6 @@ func GetProductsByUUID() []*pb.Product {
 }
 
 func GetProductsByPrice() []*pb.Product {
-	mux.Lock()
-	defer mux.Unlock()
 	if productsByPrice == nil {
 		for _, v := range products {
 			productsByPrice = append(productsByPrice, v)
@@ -125,6 +121,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to parse page param: %v\n", err)
 	}
 
+	mux.Lock()
+	defer mux.Unlock()
 	pp := GetProducts(page, sortParam)
 	bytes, err := json.Marshal(pp)
 	if err != nil {

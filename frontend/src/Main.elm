@@ -15,8 +15,9 @@ import Task
 import Random
 import Http
 import Delay
-import Json.Decode exposing (Decoder, map2, map3, map8, int, float, string, field, list, decodeString)
+import Json.Decode as Decode exposing (Decoder, map2, map3, map8, int, float, nullable, string, field, list, decodeString)
 import Json.Encode
+import Json.Decode.Pipeline exposing (required, optional)
 
 
 type alias Model =
@@ -38,14 +39,14 @@ type alias ProductDetail =
   , category:      String
   , smallImageURL: String
   , largeImageURL: String
-  , price:         Float
+  , price:         Maybe Float
   }
 
 type alias Products = List ProductOverview
 type alias ProductOverview =
   { uuid             : String
   , title            : String
-  , price            : Float
+  , price            : Maybe Float
   }
 
 type alias Cart = List CartItem
@@ -189,6 +190,8 @@ renderProduct product =
             , button [ onClick (AddToCart product.uuid) ] [ text "add to cart" ]
             , text " "
             , text product.title
+            , text " : "
+            , text (String.fromFloat (Maybe.withDefault 0.0 product.price))
             ]
 
 
@@ -202,14 +205,14 @@ renderProductDetail product =
     , li [] [text product.category ]
     , li [] [text product.smallImageURL ]
     , li [] [text product.largeImageURL ]
-    , li [] [text (String.fromFloat product.price) ]
+    , li [] [text (String.fromFloat (Maybe.withDefault 0.0 product.price)) ]
     , button [ onClick (AddToCart product.uuid) ] [ text "add to cart" ]
     ]
 
 fetchProducts : Int -> Cmd Msg
 fetchProducts pageNumber=
     Http.get
-        { url = "http://localhost:8080/products?page=" ++ String.fromInt pageNumber
+        { url = "http://localhost:8080/products?sort=price&page=" ++ String.fromInt pageNumber
         , expect = Http.expectJson GotProducts productsDecoder
         }
 
@@ -264,23 +267,24 @@ productsDecoder = list productDecoder
 
 
 productDecoder : Decoder ProductOverview
-productDecoder = map3 ProductOverview
-  (field "uuid"          string)
-  (field "title"         string)
-  (field "price"         float)
+productDecoder =
+    Decode.succeed ProductOverview
+        |> required "uuid" string
+        |> required "title" string
+        |> optional "price" (nullable float) Nothing
 
 
 productDetailDecoder : Decoder ProductDetail
-productDetailDecoder = map8 ProductDetail
-  (field "uuid"          string)
-  (field "title"         string)
-  (field "description"   string)
-  (field "longtext"      string)
-  (field "category"      string)
-  (field "smallImageURL" string)
-  (field "largeImageURL" string)
-  (field "price"         float)
-
+productDetailDecoder = 
+    Decode.succeed ProductDetail
+        |> required "uuid" string
+        |> required "title" string
+        |> required "description" string
+        |> required "longtext" string
+        |> required "smallImageURL" string
+        |> required "largeImageURL" string
+        |> required "description" string
+        |> optional "price" (nullable float) Nothing
 
 cartDecoder : Decoder Cart
 cartDecoder = list cartItemDecoder
