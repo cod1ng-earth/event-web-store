@@ -16,11 +16,15 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+type ProductsByUUID []*pb.Product
+type ProductsByPrice []*pb.Product
+
 var (
-	offset   int64
-	products map[string]*pb.Product
-	keys     []string
-	mux      sync.Mutex
+	offset          int64
+	products        map[string]*pb.Product
+	productsByUUID  ProductsByUUID
+	productsByPrice ProductsByPrice
+	mux             sync.Mutex
 )
 
 func Min(a, b int) int {
@@ -35,6 +39,55 @@ func Max(a, b int) int {
 		return b
 	}
 	return a
+}
+
+func (a ProductsByUUID) Len() int           { return len(a) }
+func (a ProductsByUUID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ProductsByUUID) Less(i, j int) bool { return a[i].Uuid < a[j].Uuid }
+
+func (a ProductsByPrice) Len() int           { return len(a) }
+func (a ProductsByPrice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ProductsByPrice) Less(i, j int) bool { return a[i].Price < a[j].Price }
+
+func GetProductsByUUID() []*pb.Product {
+	mux.Lock()
+	defer mux.Unlock()
+	if productsByUUID == nil {
+		for _, v := range products {
+			productsByUUID = append(productsByUUID, v)
+		}
+		sort.Sort(productsByUUID)
+	}
+	return productsByUUID
+}
+
+func GetProductsByPrice() []*pb.Product {
+	mux.Lock()
+	defer mux.Unlock()
+	if productsByPrice == nil {
+		for _, v := range products {
+			productsByPrice = append(productsByPrice, v)
+		}
+		sort.Sort(productsByPrice)
+	}
+	return productsByPrice
+}
+
+func GetProducts(page int, sorting string) []*pb.Product {
+	itemsPerPage := 100
+	pages := len(products) / itemsPerPage
+	page = Max(Min(page, pages-1), 0)
+	startIdx := page * itemsPerPage
+	endIdx := Min(startIdx+itemsPerPage, len(products))
+
+	switch sorting {
+	case "uuid":
+		return GetProductsByUUID()[startIdx:endIdx]
+	case "price":
+		return GetProductsByPrice()[startIdx:endIdx]
+	}
+
+	return GetProductsByUUID()[startIdx:endIdx]
 }
 
 func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
@@ -56,19 +109,14 @@ func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, fun
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
 	//	fmt.Fprintf(w, "offset: %d", offset)
-
-	mux.Lock()
-	defer mux.Unlock()
-	if keys == nil {
-		for k := range products {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-	}
-
 	pageParam := r.URL.Query().Get("page")
 	if pageParam == "" {
 		pageParam = "0"
+	}
+
+	sortParam := r.URL.Query().Get("sort")
+	if sortParam == "" {
+		sortParam = "uuid"
 	}
 
 	page, err := strconv.Atoi(pageParam)
@@ -77,17 +125,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to parse page param: %v\n", err)
 	}
 
-	itemsPerPage := 100
-	pages := len(keys) / itemsPerPage
-	page = Max(Min(page, pages-1), 0)
-	startIdx := page * itemsPerPage
-	endIdx := Min(startIdx+itemsPerPage, len(keys))
-
-	var pp []*pb.Product = make([]*pb.Product, itemsPerPage)
-	for i, k := range keys[startIdx:endIdx] {
-		pp[i] = products[k]
-	}
-
+	pp := GetProducts(page, sortParam)
 	bytes, err := json.Marshal(pp)
 	if err != nil {
 		log.Printf("failed to serialize: %v", err)
@@ -122,7 +160,8 @@ func processor(msg *sarama.ConsumerMessage) error {
 			Price: p.New.Price,
 		}
 	}
-	keys = nil
+	productsByUUID = nil
+	productsByPrice = nil
 
 	return nil
 }
