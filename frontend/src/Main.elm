@@ -136,7 +136,7 @@ renderProducts : Products -> Int -> Html Msg
 renderProducts lst pageNumber =
     div []
     [ button [ onClick PreviousPage ] [ text "previous" ]
-    , text (" Pages " ++ String.fromInt (pageNumber + 1) ++ " ")
+    , text (" Page " ++ String.fromInt (pageNumber + 1) ++ " ")
     , button [ onClick NextPage ] [ text "next" ]
     , ul [] (List.map (\l -> li [] [ renderProduct l ]) lst )
     ]
