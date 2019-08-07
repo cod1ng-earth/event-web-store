@@ -75,7 +75,7 @@ func processor(msg *sarama.ConsumerMessage) error {
 	p := pb.ProductUpdate{}
 	err := proto.Unmarshal(msg.Value, &p)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka massage %d: %v", msg.Offset, err)
+		return fmt.Errorf("failed to unmarshal kafka product details massage %d: %v", msg.Offset, err)
 	}
 
 	offset = msg.Offset

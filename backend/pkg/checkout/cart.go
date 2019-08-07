@@ -2,6 +2,7 @@ package checkout
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -17,14 +18,17 @@ import (
 
 var (
 	offset   int64
-	products map[string]*pb.Product
+	carts    map[string]map[string]int
 	mux      sync.Mutex
 	producer sarama.AsyncProducer
 )
 
 func StartCartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
 
-	consumer, err := cluster.NewConsumer(*brokers, "productdetail-cart-group", []string{"cart", "products"}, cfg)
+	offset = 0
+	carts = make(map[string]map[string]int)
+
+	consumer, err := cluster.NewConsumer(*brokers, "productdetail-cart-group", []string{"cart"}, cfg)
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
@@ -36,9 +40,6 @@ func StartCartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc,
 
 	agent := simba.NewConsumer(consumer, cartProcessor)
 	go agent.Start()
-
-	offset = 0
-	products = map[string]*pb.Product{}
 
 	return cartHandler, func() {
 		agent.Stop()
@@ -105,5 +106,35 @@ func cartHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func cartProcessor(msg *sarama.ConsumerMessage) error {
+	cc := pb.CartChange{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka cart massage %d: %v", msg.Offset, err)
+	}
+
+	offset = msg.Offset
+	//	log.Printf("offset: %d", offset)
+
+	cartId := string(msg.Key)
+
+	mux.Lock()
+	defer mux.Unlock()
+
+	if _, ok := carts[cartId]; !ok {
+		carts[cartId] = make(map[string]int)
+	}
+	if _, ok := carts[cartId][cc.Uuid]; !ok {
+		carts[cartId][cc.Uuid] = 0
+	}
+
+	switch cc.Action {
+	case pb.CartChangeAction_add:
+		carts[cartId][cc.Uuid] += 1
+	case pb.CartChangeAction_remove:
+		carts[cartId][cc.Uuid] -= 1
+	}
+
+	log.Printf("carts: %v", carts[cartId])
+
 	return nil
 }
