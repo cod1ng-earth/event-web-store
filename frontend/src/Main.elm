@@ -71,11 +71,11 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
       , content = Nothing
-      , sorting = "uuid"
+      , sorting = "name"
       , pageNumber = 0
       , cart = []
       }
-    , Cmd.batch [ fetchProducts "uuid" 0 ]
+    , Cmd.batch [ fetchProducts "name" 0 ]
     )
 
 
@@ -86,6 +86,7 @@ type Msg
     | NextPage
     | SortByUuid
     | SortByPrice
+    | SortByName
     | AddToCart String
     | GotProducts (Result Http.Error Products)
     | GotProduct (Result Http.Error ProductDetail)
@@ -109,10 +110,13 @@ update msg model =
             ( { model | pageNumber = model.pageNumber + 1 }, fetchProducts model.sorting (model.pageNumber + 1) )
 
         SortByUuid ->
-            ( { model | sorting = "uuid" }, fetchProducts "uuid" (model.pageNumber - 1)  )
+            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.pageNumber  )
 
         SortByPrice ->
-            ( { model | sorting = "price" }, fetchProducts "price" (model.pageNumber - 1)  )
+            ( { model | sorting = "price" }, fetchProducts "price" model.pageNumber  )
+
+        SortByName ->
+            ( { model | sorting = "name" }, fetchProducts "name" model.pageNumber  )
 
         AddToCart uuid ->
             ( model, addToCart (CartChange Add uuid) )
@@ -198,8 +202,9 @@ renderProducts : Products -> Int -> String -> Html Msg
 renderProducts lst pageNumber sorting =
     let
         prevEnabled = pageNumber > 0
-        uuidEnabled = sorting == "price"
-        priceEnabled = sorting == "uuid"
+        uuidDisabled = sorting == "uuid"
+        priceDisabled = sorting == "price"
+        nameDisabled = sorting == "name"
     in
     div [] [
         div [class "mdl-cell"]
@@ -209,10 +214,13 @@ renderProducts lst pageNumber sorting =
         , span [ class "custom-sorting" ]
           [ text "Sort by "
           , button
-            [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick SortByUuid, disabled (not uuidEnabled) ]
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick SortByName, disabled nameDisabled ]
+            [ text "Name" ]
+          , button
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick SortByUuid, disabled uuidDisabled ]
             [ text "Uuid" ]
           , button
-            [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick SortByPrice, disabled (not priceEnabled) ]
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick SortByPrice, disabled priceDisabled ]
             [ text "Price" ]
           ]
         ]
@@ -252,7 +260,7 @@ renderProductDetail product =
 addToCartButton : String -> Html Msg
 addToCartButton uuid =
     button
-      [ class "mdl-button mdl-button--accent mdl-list__item-secondary-action", onClick (AddToCart uuid) ]
+      [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick (AddToCart uuid) ]
       [ text "add to cart" ]
 
 fetchProducts : String -> Int -> Cmd Msg

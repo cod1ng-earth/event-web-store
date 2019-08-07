@@ -18,12 +18,14 @@ import (
 
 type ProductsByUUID []*pb.Product
 type ProductsByPrice []*pb.Product
+type ProductsByName []*pb.Product
 
 var (
 	offset          int64
 	products        map[string]*pb.Product
 	productsByUUID  ProductsByUUID
 	productsByPrice ProductsByPrice
+	productsByName ProductsByName
 	mux             sync.Mutex
 )
 
@@ -49,6 +51,10 @@ func (a ProductsByPrice) Len() int           { return len(a) }
 func (a ProductsByPrice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ProductsByPrice) Less(i, j int) bool { return a[i].Price < a[j].Price }
 
+func (a ProductsByName) Len() int           { return len(a) }
+func (a ProductsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ProductsByName) Less(i, j int) bool { return a[i].Title < a[j].Title }
+
 func GetProductsByUUID() []*pb.Product {
 	if productsByUUID == nil {
 		for _, v := range products {
@@ -69,6 +75,16 @@ func GetProductsByPrice() []*pb.Product {
 	return productsByPrice
 }
 
+func GetProductsByName() []*pb.Product {
+	if productsByName == nil {
+		for _, v := range products {
+			productsByName = append(productsByName, v)
+		}
+		sort.Sort(productsByName)
+	}
+	return productsByName
+}
+
 func GetProducts(page int, sorting string) []*pb.Product {
 	itemsPerPage := 100
 	pages := len(products) / itemsPerPage
@@ -81,6 +97,8 @@ func GetProducts(page int, sorting string) []*pb.Product {
 		return GetProductsByUUID()[startIdx:endIdx]
 	case "price":
 		return GetProductsByPrice()[startIdx:endIdx]
+	case "name":
+		return GetProductsByName()[startIdx:endIdx]
 	}
 
 	return GetProductsByUUID()[startIdx:endIdx]
