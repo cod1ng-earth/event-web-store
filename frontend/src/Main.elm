@@ -20,6 +20,7 @@ import Json.Decode exposing (Decoder, map3, map8, float, string, field, list, de
 type alias Model =
     { error : String
     , content : Maybe Content
+    , pageNumber: Int
     }
 
 type Content
@@ -48,14 +49,17 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
       , content = Nothing
+      , pageNumber = 0
       }
-    , Cmd.batch [ ]
+    , Cmd.batch [ fetchProducts 0 ]
     )
 
 
 type Msg
     = LoadProducts
     | LoadProduct String
+    | PreviousPage
+    | NextPage
     | GotProducts (Result Http.Error Products)
     | GotProduct (Result Http.Error ProductDetail)
 
@@ -65,10 +69,16 @@ update msg model =
     case msg of
 
         LoadProducts ->
-            ( model, fetchProducts )
+            ( model, fetchProducts model.pageNumber)
 
         LoadProduct uuid ->
             ( model, fetchProduct uuid )
+
+        PreviousPage ->
+            ( {model | pageNumber = model.pageNumber - 1}, fetchProducts model.pageNumber )
+
+        NextPage ->
+            ( {model | pageNumber = model.pageNumber + 1}, fetchProducts model.pageNumber )
 
         GotProducts result ->
             case result of
@@ -109,24 +119,27 @@ view model =
     div []
         [ h1 [] [ text "Hello, world." ]
         , div []
-            [ button [ onClick LoadProducts ] [ text "load products" ]
-            , button [ onClick (LoadProduct "0002630c-718d-4ffb-8989-a760cdf69c26") ] [ text "load 0002630c-718d-4ffb-8989-a760cdf69c26" ]
+            [ button [ onClick LoadProducts ] [ text "show products" ]
             , div [] [ text model.error ]
-            , div [] [ renderContent model.content ]
+            , div [] [ renderContent model ]
             ]
         ]
 
-renderContent : Maybe Content -> Html Msg
-renderContent content =
-    case content of
-        Just (Products pp) -> renderProducts pp
+renderContent : Model -> Html Msg
+renderContent model =
+    case model.content of
+        Just (Products pp) -> renderProducts pp model.pageNumber
         Just (Product p) -> renderProductDetail p
         Nothing -> text "" 
 
-renderProducts : Products -> Html Msg
-renderProducts lst =
-    ul []
-        (List.map (\l -> li [] [ renderProduct l ]) lst )
+renderProducts : Products -> Int -> Html Msg
+renderProducts lst pageNumber =
+    div []
+    [ button [ onClick PreviousPage ] [ text "previous" ]
+    , text (" Page " ++ String.fromInt pageNumber ++ " ")
+    , button [ onClick NextPage ] [ text "next" ]
+    , ul [] (List.map (\l -> li [] [ renderProduct l ]) lst )
+    ]
 
 renderProduct : ProductOverview  -> Html Msg
 renderProduct product =
@@ -149,10 +162,10 @@ renderProductDetail product =
     , li [] [text (String.fromFloat product.price) ]
     ]
 
-fetchProducts : Cmd Msg
-fetchProducts =
+fetchProducts : Int -> Cmd Msg
+fetchProducts pageNumber=
     Http.get
-        { url = "http://localhost:8080/all-products"
+        { url = "http://localhost:8080/products?page=" ++ String.fromInt pageNumber
         , expect = Http.expectJson GotProducts productsDecoder
         }
 
