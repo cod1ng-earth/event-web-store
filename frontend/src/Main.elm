@@ -24,7 +24,8 @@ import Round exposing (round)
 type alias Model =
     { error : String
     , content : Maybe Content
-    , pageNumber: Int
+    , sorting : String
+    , pageNumber : Int
     , cart : Cart
     }
 
@@ -70,10 +71,11 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
       , content = Nothing
+      , sorting = "uuid"
       , pageNumber = 0
       , cart = []
       }
-    , Cmd.batch [ fetchProducts 0 ]
+    , Cmd.batch [ fetchProducts "uuid" 0 ]
     )
 
 
@@ -82,6 +84,8 @@ type Msg
     | LoadProduct String
     | PreviousPage
     | NextPage
+    | SortByUuid
+    | SortByPrice
     | AddToCart String
     | GotProducts (Result Http.Error Products)
     | GotProduct (Result Http.Error ProductDetail)
@@ -93,16 +97,22 @@ update msg model =
     case msg of
 
         LoadProducts ->
-            ( model, fetchProducts model.pageNumber)
+            ( model, fetchProducts model.sorting model.pageNumber)
 
         LoadProduct uuid ->
             ( model, fetchProduct uuid )
 
         PreviousPage ->
-            ( {model | pageNumber = model.pageNumber - 1}, fetchProducts (model.pageNumber - 1)  )
+            ( { model | pageNumber = model.pageNumber - 1 }, fetchProducts model.sorting (model.pageNumber - 1)  )
 
         NextPage ->
-            ( {model | pageNumber = model.pageNumber + 1}, fetchProducts (model.pageNumber + 1) )
+            ( { model | pageNumber = model.pageNumber + 1 }, fetchProducts model.sorting (model.pageNumber + 1) )
+
+        SortByUuid ->
+            ( { model | sorting = "uuid" }, fetchProducts "uuid" (model.pageNumber - 1)  )
+
+        SortByPrice ->
+            ( { model | sorting = "price" }, fetchProducts "price" (model.pageNumber - 1)  )
 
         AddToCart uuid ->
             ( model, addToCart (CartChange Add uuid) )
@@ -180,20 +190,31 @@ itemsInCart cart =
 renderContent : Model -> Html Msg
 renderContent model =
     case model.content of
-        Just (Products pp) -> renderProducts pp model.pageNumber
+        Just (Products pp) -> renderProducts pp model.pageNumber model.sorting
         Just (Product p) -> renderProductDetail p
         Nothing -> text "" 
 
-renderProducts : Products -> Int -> Html Msg
-renderProducts lst pageNumber =
+renderProducts : Products -> Int -> String -> Html Msg
+renderProducts lst pageNumber sorting =
     let
         prevEnabled = pageNumber > 0
+        uuidEnabled = sorting == "price"
+        priceEnabled = sorting == "uuid"
     in
     div [] [
         div [class "mdl-cell"]
         [ button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick PreviousPage, disabled (not prevEnabled) ] [ i [ class "material-icons" ] [ text "remove" ] ]
         , span [ class "mdl-title custom-page-number"] [ text (" Page " ++ String.fromInt (pageNumber + 1) ++ " ")]
         , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage ] [ i [ class "material-icons" ] [ text "add" ] ]
+        , span [ class "custom-sorting" ]
+          [ text "Sort by "
+          , button
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick SortByUuid, disabled (not uuidEnabled) ]
+            [ text "Uuid" ]
+          , button
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick SortByPrice, disabled (not priceEnabled) ]
+            [ text "Price" ]
+          ]
         ]
         , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst )
     ]
@@ -234,10 +255,10 @@ addToCartButton uuid =
       [ class "mdl-button mdl-button--accent mdl-list__item-secondary-action", onClick (AddToCart uuid) ]
       [ text "add to cart" ]
 
-fetchProducts : Int -> Cmd Msg
-fetchProducts pageNumber=
+fetchProducts : String -> Int -> Cmd Msg
+fetchProducts sorting pageNumber =
     Http.get
-        { url = "http://localhost:8080/products?sort=price&page=" ++ String.fromInt pageNumber
+        { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&page=" ++ String.fromInt pageNumber
         , expect = Http.expectJson GotProducts productsDecoder
         }
 
@@ -315,6 +336,7 @@ cartDecoder : Decoder Cart
 cartDecoder = list cartItemDecoder
 
 cartItemDecoder : Decoder CartItem
-cartItemDecoder = map2 CartItem
-  (field "product"  productDetailDecoder)
-  (field "quantiy"  int)
+cartItemDecoder =
+    Decode.succeed CartItem
+        |> required "product" productDetailDecoder
+        |> required "quantiy" int
