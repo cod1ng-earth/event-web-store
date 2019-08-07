@@ -75,10 +75,10 @@ update msg model =
             ( model, fetchProduct uuid )
 
         PreviousPage ->
-            ( {model | pageNumber = model.pageNumber - 1}, fetchProducts model.pageNumber )
+            ( {model | pageNumber = model.pageNumber - 1}, fetchProducts (model.pageNumber - 1)  )
 
         NextPage ->
-            ( {model | pageNumber = model.pageNumber + 1}, fetchProducts model.pageNumber )
+            ( {model | pageNumber = model.pageNumber + 1}, fetchProducts (model.pageNumber + 1) )
 
         GotProducts result ->
             case result of
