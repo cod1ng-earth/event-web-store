@@ -16,17 +16,17 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-type ProductsByUUID []*pb.Product
-type ProductsByPrice []*pb.Product
-type ProductsByName []*pb.Product
+type productsByUUID []*pb.Product
+type productsByPrice []*pb.Product
+type productsByName []*pb.Product
 
 var (
-	offset          int64
-	products        map[string]*pb.Product
-	productsByUUID  ProductsByUUID
-	productsByPrice ProductsByPrice
-	productsByName ProductsByName
-	mux             sync.Mutex
+	offset        int64
+	products      map[string]*pb.Product
+	sortedByUUID  productsByUUID
+	sortedByPrice productsByPrice
+	sortedByName  productsByName
+	mux           sync.Mutex
 )
 
 func Min(a, b int) int {
@@ -43,49 +43,49 @@ func Max(a, b int) int {
 	return a
 }
 
-func (a ProductsByUUID) Len() int           { return len(a) }
-func (a ProductsByUUID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ProductsByUUID) Less(i, j int) bool { return a[i].Uuid < a[j].Uuid }
+func (a productsByUUID) Len() int           { return len(a) }
+func (a productsByUUID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a productsByUUID) Less(i, j int) bool { return a[i].Uuid < a[j].Uuid }
 
-func (a ProductsByPrice) Len() int           { return len(a) }
-func (a ProductsByPrice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ProductsByPrice) Less(i, j int) bool { return a[i].Price < a[j].Price }
+func (a productsByPrice) Len() int           { return len(a) }
+func (a productsByPrice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a productsByPrice) Less(i, j int) bool { return a[i].Price < a[j].Price }
 
-func (a ProductsByName) Len() int           { return len(a) }
-func (a ProductsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ProductsByName) Less(i, j int) bool { return a[i].Title < a[j].Title }
+func (a productsByName) Len() int           { return len(a) }
+func (a productsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a productsByName) Less(i, j int) bool { return a[i].Title < a[j].Title }
 
-func GetProductsByUUID() []*pb.Product {
-	if productsByUUID == nil {
+func getProductsByUUID() []*pb.Product {
+	if sortedByUUID == nil {
 		for _, v := range products {
-			productsByUUID = append(productsByUUID, v)
+			sortedByUUID = append(sortedByUUID, v)
 		}
-		sort.Sort(productsByUUID)
+		sort.Sort(sortedByUUID)
 	}
-	return productsByUUID
+	return sortedByUUID
 }
 
-func GetProductsByPrice() []*pb.Product {
-	if productsByPrice == nil {
+func getProductsByPrice() []*pb.Product {
+	if sortedByPrice == nil {
 		for _, v := range products {
-			productsByPrice = append(productsByPrice, v)
+			sortedByPrice = append(sortedByPrice, v)
 		}
-		sort.Sort(productsByPrice)
+		sort.Sort(sortedByPrice)
 	}
-	return productsByPrice
+	return sortedByPrice
 }
 
-func GetProductsByName() []*pb.Product {
-	if productsByName == nil {
+func getProductsByName() []*pb.Product {
+	if sortedByName == nil {
 		for _, v := range products {
-			productsByName = append(productsByName, v)
+			sortedByName = append(sortedByName, v)
 		}
-		sort.Sort(productsByName)
+		sort.Sort(sortedByName)
 	}
-	return productsByName
+	return sortedByName
 }
 
-func GetProducts(page int, sorting string) []*pb.Product {
+func getProducts(page int, sorting string) ([]*pb.Product, error) {
 	itemsPerPage := 100
 	pages := len(products) / itemsPerPage
 	page = Max(Min(page, pages-1), 0)
@@ -94,14 +94,14 @@ func GetProducts(page int, sorting string) []*pb.Product {
 
 	switch sorting {
 	case "uuid":
-		return GetProductsByUUID()[startIdx:endIdx]
+		return getProductsByUUID()[startIdx:endIdx], nil
 	case "price":
-		return GetProductsByPrice()[startIdx:endIdx]
+		return getProductsByPrice()[startIdx:endIdx], nil
 	case "name":
-		return GetProductsByName()[startIdx:endIdx]
+		return getProductsByName()[startIdx:endIdx], nil
+	default:
+		return nil, fmt.Errorf("sorting %s unknown", sorting)
 	}
-
-	return GetProductsByUUID()[startIdx:endIdx]
 }
 
 func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
@@ -136,13 +136,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	page, err := strconv.Atoi(pageParam)
 	if err != nil {
-		page = 0
 		log.Printf("failed to parse page param: %v\n", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	mux.Lock()
 	defer mux.Unlock()
-	pp := GetProducts(page, sortParam)
+	pp, err := getProducts(page, sortParam)
+	if err != nil {
+		log.Printf("failed to get products: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	bytes, err := json.Marshal(pp)
 	if err != nil {
 		log.Printf("failed to serialize: %v", err)
@@ -177,8 +184,9 @@ func processor(msg *sarama.ConsumerMessage) error {
 			Price: p.New.Price,
 		}
 	}
-	productsByUUID = nil
-	productsByPrice = nil
+	sortedByUUID = nil
+	sortedByPrice = nil
+	sortedByName = nil
 
 	return nil
 }
