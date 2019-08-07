@@ -6,9 +6,9 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events exposing (onVisibilityChange, Visibility(..))
-import Html exposing (Html, button, div, text, h1, ol, ul, li, a)
+import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer)
 import Html.Events exposing (onClick)
-import Html.Attributes exposing (href, class)
+import Html.Attributes exposing (href, class, id, disabled)
 import List exposing (foldl)
 import Time
 import Task
@@ -149,13 +149,18 @@ toString error =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ h1 [ class "dings" ] [ text "Hello, world." ]
-        , div []
-            [ button [ onClick LoadProducts ] [ text "show products" ]
-            , div [] [ renderCart model.cart ]
-            , div [] [ text model.error ]
-            , div [] [ renderContent model ]
+    div [class "mdl-layout mdl-layout--fixed-header"] [
+        header [class "mdl-layout__header mdl-layout__header--waterfall custom-header"] [
+            div [class "mdl-layout__header-row custom-header-row"] [
+                span [class "mdl-layout__title"] [ text "Event Thingy Store" ]
+                , div [class "mdl-layout-spacer"] []
+--                , div [] [ renderCart model.cart ]
+                , div [] [ text model.error ]
+                , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts ] [ text "load products" ]
+            ]
+        ]
+        , div [class "mdl-layout__content", id "main"] [
+                div [] [ renderContent model ]
             ]
         ]
 
@@ -176,22 +181,21 @@ renderContent model =
 
 renderProducts : Products -> Int -> Html Msg
 renderProducts lst pageNumber =
-    div []
-    [ button [ onClick PreviousPage ] [ text "previous" ]
-    , text (" Page " ++ String.fromInt (pageNumber + 1) ++ " ")
-    , button [ onClick NextPage ] [ text "next" ]
-    , ul [] (List.map (\l -> li [] [ renderProduct l ]) lst )
+    div [] [
+        div [class "mdl-cell"] [
+            button [ class "mdl-button mdl-button--raised", onClick PreviousPage ] [ text "previous" ]
+            , span [class "mdl-title custom-page-number"] [text (" Page " ++ String.fromInt (pageNumber + 1) ++ " ")]
+            , button [ class "mdl-button mdl-button--raised", onClick NextPage ] [ text "next" ]
+        ]
+        , ul [class "product-list mdl-list"] (List.map (\l -> renderProduct l ) lst )
     ]
 
 renderProduct : ProductOverview  -> Html Msg
 renderProduct product =
-    div []
-            [ button [ onClick (LoadProduct product.uuid) ] [ text "more details!" ]
-            , button [ onClick (AddToCart product.uuid) ] [ text "add to cart" ]
-            , text " "
-            , text product.title
-            , text " : "
-            , text (String.fromFloat (Maybe.withDefault 0.0 product.price))
+    li [class "mdl-list__item mdl-list__item--two-line onclick", onClick (LoadProduct product.uuid)]
+    [ span [ class "mdl-list__item-primary-content" ] [ span [] [text product.title], span [class "mdl-list__item-sub-title"] [ text "price: ", text (String.fromFloat product.price) ] ]
+    , span [ class "mdl-list__item-secondary-content" ] [ button [ class "mdl-button mdl-button--accent mdl-list__item-secondary-action", disabled False ] [ text "add to cart" ] ]
+--            , text (String.fromFloat (Maybe.withDefault 0.0 product.price))
             ]
 
 
