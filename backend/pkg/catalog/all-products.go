@@ -6,12 +6,13 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 	"sync"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
+	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -21,6 +22,20 @@ var (
 	keys     []string
 	mux      sync.Mutex
 )
+
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func Max(a, b int) int {
+	if a < b {
+		return b
+	}
+	return a
+}
 
 func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
 
@@ -51,12 +66,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sort.Strings(keys)
 	}
 
-	max := 100
-	if len(keys) < max {
-		max = len(keys)
+	pageParam := r.URL.Query().Get("page")
+	if pageParam == "" {
+		pageParam = "0"
 	}
-	var pp []*pb.Product = make([]*pb.Product, max-1)
-	for i, k := range keys[0 : max-1] {
+
+	page, err := strconv.Atoi(pageParam)
+	if err != nil {
+		page = 0
+		log.Printf("failed to parse page param: %v\n", err)
+	}
+
+	itemsPerPage := 100
+	pages := len(keys) / itemsPerPage
+	page = Max(Min(page, pages-1), 0)
+	startIdx := page * itemsPerPage
+	endIdx := Min(startIdx+itemsPerPage, len(keys))
+
+	var pp []*pb.Product = make([]*pb.Product, itemsPerPage)
+	for i, k := range keys[startIdx:endIdx] {
 		pp[i] = products[k]
 	}
 
@@ -87,15 +115,14 @@ func processor(msg *sarama.ConsumerMessage) error {
 	defer mux.Unlock()
 	if p.New == nil {
 		delete(products, UUID)
-		keys = nil
 	} else {
 		products[UUID] = &pb.Product{
 			Uuid:  p.New.Uuid,
 			Title: p.New.Title,
 			Price: p.New.Price,
 		}
-		keys = nil
 	}
+	keys = nil
 
 	return nil
 }
