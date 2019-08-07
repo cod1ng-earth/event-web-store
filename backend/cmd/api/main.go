@@ -14,10 +14,11 @@ import (
 
 var (
 	brokerList = kingpin.Flag("brokerList", "List of brokers to connect").Default("localhost:9092").Strings()
-	topic      = kingpin.Flag("topic", "Topic name").Default("products").String()
 )
 
 func main() {
+	log.Println("Hello, world!")
+
 	kingpin.Parse()
 
 	config := cluster.NewConfig()
@@ -26,8 +27,6 @@ func main() {
 	config.Group.Return.Notifications = true
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Flush.MaxMessages = 500
-
-	log.Println("Hello, world!")
 
 	catalogHandler, catalogShutdown := catalog.StartHandler(brokerList, config)
 	defer catalogShutdown()
@@ -41,5 +40,6 @@ func main() {
 	defer cartShutdown()
 	http.HandleFunc("/cart", cartHandler)
 
+	log.Println("listening on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
