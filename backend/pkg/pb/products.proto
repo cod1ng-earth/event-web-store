@@ -17,3 +17,13 @@ message ProductUpdate {
     Product old = 1;
     Product new = 2;
 }
+
+message CartChange {
+    string uuid = 1;
+    CartChangeAction action = 2;
+}
+
+enum CartChangeAction {
+    add = 0;
+    remove = 1;
+}

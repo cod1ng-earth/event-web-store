@@ -222,24 +222,29 @@ fetchProduct uuid =
 
 addToCart : CartChange -> Cmd Msg
 addToCart cartChange =
-    Http.post
-        { url = "http://localhost:8080/cart"
+    Http.riskyRequest
+        { method = "POST"
+        , headers = []
+        , url = "http://localhost:8080/cart"
         , body = Http.jsonBody (encodeCartChange cartChange)
         , expect = Http.expectJson AddedToCart cartDecoder
+        , timeout = Nothing
+        , tracker = Nothing
         }
 
 encodeCartChange : CartChange -> Json.Encode.Value
 encodeCartChange cc  =
     Json.Encode.object
-        [ ( "action", Json.Encode.string (cartActionToString cc.action) )
+        [ ( "action", Json.Encode.int (cartActionToString cc.action) )
         , ( "uuid", Json.Encode.string cc.uuid )
         ]
 
-cartActionToString : CartAction -> String
+cartActionToString : CartAction -> Int
 cartActionToString c =
     case c of
-      Add -> "add"
-      Remove -> "add"
+-- needs to match the values from protobuf
+      Add -> 0
+      Remove -> 1
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.batch []
