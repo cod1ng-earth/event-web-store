@@ -27,6 +27,7 @@ func main() {
 	config.Group.Return.Notifications = true
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Flush.MaxMessages = 500
+	config.Producer.Return.Successes = true
 
 	catalogHandler, catalogShutdown := catalog.StartHandler(brokerList, config)
 	defer catalogShutdown()

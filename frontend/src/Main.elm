@@ -54,7 +54,7 @@ type alias ProductOverview =
 type alias Cart = List CartItem
 type alias CartItem =
   { product: ProductDetail
-  , quantiy: Int
+  , quantity: Int
   }
 
 type alias CartChange =
@@ -347,4 +347,4 @@ cartItemDecoder : Decoder CartItem
 cartItemDecoder =
     Decode.succeed CartItem
         |> required "product" productDetailDecoder
-        |> required "quantiy" int
+        |> required "quantity" int

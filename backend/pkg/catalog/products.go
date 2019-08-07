@@ -152,7 +152,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	bytes, err := json.Marshal(pp)
 	if err != nil {
-		log.Printf("failed to serialize: %v", err)
+		log.Printf("failed to serialize products: %v", err)
 	}
 
 	_, err = w.Write(bytes)
