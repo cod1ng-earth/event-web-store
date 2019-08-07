@@ -38,6 +38,7 @@ func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, fun
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
+	w.Header().Set("Content-Type", "application/json")
 	//	fmt.Fprintf(w, "offset: %d", offset)
 
 	mux.Lock()
