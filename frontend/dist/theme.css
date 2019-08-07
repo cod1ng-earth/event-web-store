@@ -1,20 +1,28 @@
-.custom-header{
+.custom-header {
     color: white;
     background: black;
 }
-.custom-header-row{
+.custom-header-row {
     padding-left: 16px;
 }
-.custom-page-number{
+.custom-page-number {
     display: inline-block;
     height: 36px;
     min-width: 64px;
     padding: 0 16px;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 500;
     letter-spacing: 0;
     line-height: 36px;
     text-align: center;
     vertical-align: middle;
+    text-transform: uppercase;
+}
+.custom-header-cart {
+    font-size: 18px;
+    margin: 0 40px;
+}
+.custom-header-error {
+    font-size: 20px;
     text-transform: uppercase;
 }

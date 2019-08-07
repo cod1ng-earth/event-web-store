@@ -2,7 +2,7 @@ start:
 	elm-live src/Main.elm --dir=./dist --pushstate -- --output=./dist/main.js
 
 open:
-	elm-live src/Main.elm --open
+	elm-live src/Main.elm --dir=./dist --pushstate -- --output=./dist/main.js --open
 
 # https://github.com/rtfeldman/elm-spa-example
 # $ elm make src/Main.elm --output elm.js --optimize
