@@ -8,7 +8,7 @@ import Browser
 import Browser.Events exposing (onVisibilityChange, Visibility(..))
 import Html exposing (Html, button, div, text, h1, ol, ul, li, a)
 import Html.Events exposing (onClick)
-import Html.Attributes exposing (href)
+import Html.Attributes exposing (href, class)
 import Time
 import Task
 import Random
@@ -117,7 +117,7 @@ toString error =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Hello, world." ]
+        [ h1 [ class "dings" ] [ text "Hello, world." ]
         , div []
             [ button [ onClick LoadProducts ] [ text "show products" ]
             , div [] [ text model.error ]
@@ -136,7 +136,7 @@ renderProducts : Products -> Int -> Html Msg
 renderProducts lst pageNumber =
     div []
     [ button [ onClick PreviousPage ] [ text "previous" ]
-    , text (" Page " ++ String.fromInt pageNumber ++ " ")
+    , text (" Pages " ++ String.fromInt (pageNumber + 1) ++ " ")
     , button [ onClick NextPage ] [ text "next" ]
     , ul [] (List.map (\l -> li [] [ renderProduct l ]) lst )
     ]

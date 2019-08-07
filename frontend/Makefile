@@ -1,5 +1,5 @@
 start:
-	elm-live src/Main.elm
+	elm-live src/Main.elm --dir=./dist --pushstate -- --output=./dist/main.js
 
 open:
 	elm-live src/Main.elm --open
