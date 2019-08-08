@@ -41,8 +41,14 @@ import: products-1.csv ##@import Import products
 update: products-1.csv products-2.csv  ##@import Update products
 	go run ./cmd/csv-import/main.go products-2.csv products-1.csv
 
+stock: products-1-stock.csv ##@import Import stock
+	go run ./cmd/stock-import/main.go products-1-stock.csv
+
 products-1.csv: cmd/csv-fake-create/main.go
 	go run ./cmd/csv-fake-create/main.go -seed=0 > products-1.csv
+
+products-1-stock.csv: products-1.csv cmd/csv-fake-stock/main.go
+	cat products-1.csv | go run ./cmd/csv-fake-stock/main.go -seed=2 > products-1-stock.csv
 
 products-2.csv: products-1.csv cmd/csv-fake-alternate/main.go
 	cat products-1.csv | go run ./cmd/csv-fake-alternate/main.go -seed=1 > products-2.csv

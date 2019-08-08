@@ -27,3 +27,8 @@ enum CartChangeAction {
     add = 0;
     remove = 1;
 }
+
+message Stock {
+    string uuid = 1;
+    sint64 quantity = 2;
+}
