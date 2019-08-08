@@ -51,11 +51,14 @@ lint: ##@develop Run the go linter
 pkg/pb/products.pb.go: pkg/pb/products.proto
 	protoc --go_out=. pkg/pb/products.proto
 
-ab: ##@benchmark show throughput
-	ab -c 4 -n 200000 -k http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710
+warmup: ##@benchmark warmup process
+	ab -c 4 -n 1000 -k http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b 2>/dev/null 1>/dev/null
 
-results.bin: $(shell find cmd pkg Makfile -type f)
-	echo "GET http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710" | vegeta attack -workers=4 -max-workers=4 -rate=0 -duration=5s > results.bin
+ab: ##@benchmark show throughput
+	ab -c 4 -n 200000 -k http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b
+
+results.bin: $(shell find cmd pkg -type f) Makefile
+	echo "GET http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b" | vegeta attack -workers=4 -max-workers=4 -rate=0 -duration=5s > results.bin
 
 hdrplot: results.bin ##@benchmark show latency histogram
 	vegeta report --type hdrplot results.bin
