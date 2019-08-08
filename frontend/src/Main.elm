@@ -9,7 +9,7 @@ import Browser.Events exposing (onVisibilityChange, Visibility(..))
 import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img, input)
 import Html.Events exposing (onClick, onInput)
 import Html.Attributes exposing (href, class, id, disabled, attribute, src, placeholder)
-import List exposing (foldl)
+import List exposing (foldl, append)
 import Time
 import Task
 import Random
@@ -38,6 +38,8 @@ type Content
   = Products ProductList
   | Product ProductDetail
   | CartPage
+  | OrderSuccess
+  | OrderFailure
 
 type alias ProductDetail =
   { uuid:          String
@@ -86,18 +88,23 @@ type CartAction
   = Add
   | Remove
 
+type alias OrderStatus =
+  { status: String
+  }
+
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
-      , content = Nothing
+      , content = Just CartPage
       , sorting = "name"
       , filtering = ""
       , currentPage = 0
       , prefix = ""
       , cart = []
       }
-    , Cmd.batch [ fetchProducts "name" 0 "" "", fetchCart ]
+--    , Cmd.batch [ fetchProducts "name" 0 "" "", fetchCart ]
+    , Cmd.batch [ fetchCart ]
     )
 
 
@@ -113,9 +120,11 @@ type Msg
     | EnableFilterByPrefix
     | AddToCart String
     | RemoveFromCart String
+    | OrderCart
     | GotProducts (Result Http.Error ProductList)
     | GotProduct (Result Http.Error ProductDetail)
     | CartGotChanged (Result Http.Error Cart)
+    | CartGotOrdered (Result Http.Error OrderStatus)
     | ShowCart
     | GoToPage String
     | SetFilterPrefix String
@@ -158,6 +167,9 @@ update msg model =
         RemoveFromCart uuid ->
             ( model, updateCart (CartChange Remove uuid) )
 
+        OrderCart ->
+            ( model, orderCart )
+
         GotProducts result ->
             case result of
                 Ok pp ->
@@ -178,6 +190,17 @@ update msg model =
                     ( { model | cart = c, error = "" }, Cmd.none )
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
+
+        CartGotOrdered result ->
+            case result of
+                Ok c ->
+                    let
+                        cont = if c.status == "success" then Just OrderSuccess
+                               else Just OrderFailure
+                    in
+                    ( { model | content = cont, cart = [], error = "" }, Cmd.none )
+                Err e ->
+                    ( { model | error = toString e }, Cmd.none )
 
         ShowCart ->
             ( { model | content = Just CartPage }, Cmd.none  )
@@ -215,6 +238,8 @@ view model =
             Just (Products pp) -> (False, True)
             Just (Product p) -> (False, False)
             Just CartPage -> (True, False)
+            Just OrderSuccess -> (False, False)
+            Just OrderFailure -> (False, False)
             Nothing -> (False, False)
     in
     div [class "mdl-layout mdl-layout--fixed-header"]
@@ -262,6 +287,8 @@ renderContent model =
         Just (Products pp) -> renderProducts pp model.sorting model.filtering
         Just (Product p) -> renderProductDetail p
         Just CartPage -> renderCart model.cart
+        Just OrderSuccess -> h1 [] [ text "Order was successful" ]
+        Just OrderFailure -> h1 [] [ text "Ordering failed" ]
         Nothing -> text "" 
 
 
@@ -375,7 +402,11 @@ addToCartButton uuid =
 
 renderCart : Cart -> Html Msg
 renderCart cart =
-    ul [ class "product-list mdl-list" ] (List.map (\l -> renderCartItem l ) cart )
+    let
+        head = List.map (\l -> renderCartItem l ) cart
+        tail = [ li [] [ button [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick (OrderCart) ] [ text "Order Now" ] ] ]
+    in
+        ul [ class "product-list mdl-list" ] (append head tail)
 
 
 renderCartItem : CartItem -> Html Msg
@@ -432,6 +463,19 @@ updateCart cartChange =
         , url = "http://localhost:8080/cart"
         , body = Http.jsonBody (encodeCartChange cartChange)
         , expect = Http.expectJson CartGotChanged cartDecoder
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+orderCart : Cmd Msg
+orderCart =
+    Http.riskyRequest
+        { method = "POST"
+        , headers = []
+        , url = "http://localhost:8080/orderCart"
+        , body = Http.emptyBody
+        , expect = Http.expectJson CartGotOrdered cartOrderedDecoder
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -524,3 +568,8 @@ cartItemDecoder =
         |> required "quantity" int
         |> required "moreInStock" bool
         |> required "inStock" bool
+
+cartOrderedDecoder : Decoder OrderStatus
+cartOrderedDecoder =
+    Decode.succeed OrderStatus
+        |> required "status" string

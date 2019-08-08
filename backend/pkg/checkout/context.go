@@ -22,6 +22,7 @@ var (
 	products map[string]*pb.Product
 	stock    map[string]int64
 	carts    map[string]map[string]int64
+	orders   map[string]map[string]int64
 )
 
 func init() {
@@ -30,6 +31,7 @@ func init() {
 	products = map[string]*pb.Product{}
 	stock = map[string]int64{}
 	carts = make(map[string]map[string]int64)
+	orders = make(map[string]map[string]int64)
 }
 
 func StartCheckoutContext(brokers *[]string, cfg *cluster.Config) func() {
@@ -80,6 +82,9 @@ func checkoutProcessor(msg *sarama.ConsumerMessage) error {
 		if err := productsProcessor(cc.GetProductUpdate()); err != nil {
 			return err
 		}
+
+	case *pb.CheckoutContext_CartOrder:
+		ordersProcessor(cc.GetCartOrder(), offset)
 
 	case nil:
 		panic(fmt.Sprintf("checkout context message is empty"))
