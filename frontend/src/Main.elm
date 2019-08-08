@@ -173,6 +173,13 @@ view : Model -> Html Msg
 view model =
     let
         count = String.fromInt (itemsInCart model.cart)
+
+        (showingCart, showingCatalog) = case model.content of
+            Just (Products pp) -> (False, True)
+            Just (Product p) -> (False, False)
+            Just CartPage -> (True, False)
+            Nothing -> (False, False)
+
     in
     div [class "mdl-layout mdl-layout--fixed-header"]
     [ header [ class "mdl-layout__header mdl-layout__header--waterfall custom-header"]
@@ -182,7 +189,8 @@ view model =
         , div [ class "custom-header-error"] [ text model.error ]
         , div [ class "mdl-layout-spacer"] []
         , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" count, onClick ShowCart ] [ text "Cart" ] ]
-        , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts ] [ text "show products" ]
+        , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick ShowCart, disabled showingCart ] [ text "show Cart" ]
+        , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts, disabled showingCatalog ] [ text "show products" ]
         ]
       ]
       , div [ class "mdl-layout__content", id "main"] [ renderContent model ]
