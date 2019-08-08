@@ -30,6 +30,8 @@ help: ##@other Show this help.
 
 export GO111MODULE=on
 
+URL = "http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b"
+
 start: ##@develop Start the backend
 	air -c air.conf
 
@@ -51,14 +53,17 @@ lint: ##@develop Run the go linter
 pkg/pb/products.pb.go: pkg/pb/products.proto
 	protoc --go_out=. pkg/pb/products.proto
 
+curl: ##@benchmark show json
+	curl -v --silent ${URL} | jq .
+
 warmup: ##@benchmark warmup process
-	ab -c 4 -n 1000 -k http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b 2>/dev/null 1>/dev/null
+	ab -c 1 -n 1000 -k ${URL}
 
 ab: ##@benchmark show throughput
-	ab -c 4 -n 200000 -k http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b
+	ab -c 4 -n 200000 -k ${URL}
 
 results.bin: $(shell find cmd pkg -type f) Makefile
-	echo "GET http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b" | vegeta attack -workers=4 -max-workers=4 -rate=0 -duration=5s > results.bin
+	echo "GET ${URL}" | vegeta attack -workers=4 -max-workers=4 -rate=0 -duration=5s > results.bin
 
 hdrplot: results.bin ##@benchmark show latency histogram
 	vegeta report --type hdrplot results.bin
