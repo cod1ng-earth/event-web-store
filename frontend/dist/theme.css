@@ -49,3 +49,8 @@
 .custom-detail-block {
     display: block;
 }
+
+.custom-go-to-page {
+    display: block;
+    width: 100px;
+}

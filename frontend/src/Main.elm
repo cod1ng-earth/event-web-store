@@ -6,9 +6,9 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events exposing (onVisibilityChange, Visibility(..))
-import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img)
-import Html.Events exposing (onClick)
-import Html.Attributes exposing (href, class, id, disabled, attribute, src)
+import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img, input)
+import Html.Events exposing (onClick, onInput)
+import Html.Attributes exposing (href, class, id, disabled, attribute, src, placeholder)
 import List exposing (foldl)
 import Time
 import Task
@@ -107,6 +107,7 @@ type Msg
     | GotProduct (Result Http.Error ProductDetail)
     | CartGotChanged (Result Http.Error Cart)
     | ShowCart
+    | GoToPage String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -120,10 +121,10 @@ update msg model =
             ( model, fetchProduct uuid )
 
         PreviousPage ->
-            ( { model | pageNumber = model.pageNumber - 1 }, fetchProducts model.sorting (model.pageNumber - 1)  )
+            ( model, fetchProducts model.sorting (model.pageNumber - 1)  )
 
         NextPage ->
-            ( { model | pageNumber = model.pageNumber + 1 }, fetchProducts model.sorting (model.pageNumber + 1) )
+            ( model, fetchProducts model.sorting (model.pageNumber + 1) )
 
         SortByUuid ->
             ( { model | sorting = "uuid" }, fetchProducts "uuid" model.pageNumber  )
@@ -140,7 +141,7 @@ update msg model =
         GotProducts result ->
             case result of
                 Ok pp ->
-                    ( { model | content = Just (Products pp), error = "" }, Cmd.none )
+                    ( { model | content = Just (Products pp), pageNumber = pp.meta.current_page, error = "" }, Cmd.none )
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
 
@@ -160,6 +161,9 @@ update msg model =
 
         ShowCart ->
             ( { model | content = Just CartPage }, Cmd.none  )
+
+        GoToPage page ->
+            ( model, fetchProducts model.sorting (Maybe.withDefault 0 (String.toInt page) - 1) )
 
 
 toString : Http.Error -> String
@@ -235,6 +239,7 @@ renderProducts lst pageNumber sorting =
         [ button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick PreviousPage, disabled (not prevEnabled) ] [ i [ class "material-icons" ] [ text "remove" ] ]
         , span [ class "mdl-title custom-page-number"]
           [ text (" Page " ++ String.fromInt (pageNumber + 1) ++ " from " ++ String.fromInt(lst.meta.total_pages))
+          , input [ class "custom-go-to-page", placeholder "Go to page", onInput GoToPage ] []
           ]
         , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage ] [ i [ class "material-icons" ] [ text "add" ] ]
         , span [ class "custom-sorting" ]

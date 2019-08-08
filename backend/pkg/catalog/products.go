@@ -105,8 +105,12 @@ func getPages() int {
 	return len(products) / itemsPerPage
 }
 
+func clampPage(page int) int {
+	return Max(Min(page, getPages()-1), 0)
+}
+
 func getProducts(page int, sorting string) ([]*pb.Product, error) {
-	page = Max(Min(page, getPages()-1), 0)
+	page = clampPage(page)
 	startIdx := page * itemsPerPage
 	endIdx := Min(startIdx+itemsPerPage, len(products))
 
@@ -167,7 +171,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload := catalogPayload{pp, catalogPayloadMeta{len(products), getPages(), page, itemsPerPage}}
+	payload := catalogPayload{pp, catalogPayloadMeta{len(products), getPages(), clampPage(page), itemsPerPage}}
 	bytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("failed to serialize products: %v", err)
