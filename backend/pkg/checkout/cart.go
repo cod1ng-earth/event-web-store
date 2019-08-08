@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
@@ -13,15 +14,20 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+type cart []cartItem
+
 type cartItem struct {
-	Product  *pb.Product `json:"product,omitempty"`
-	Quantity int         `json:"quantity,omitempty"`
+	Product     *pb.Product `json:"product"`
+	Quantity    int64       `json:"quantity"`
+	MoreInStock bool        `json:"moreInStock"`
+	InStock     bool        `json:"inStock"`
 }
 
-func CartHandler(w http.ResponseWriter, r *http.Request) {
-	//	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000|http://localhost:8080")
-	//	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Set-Cookie")
+func (a cart) Len() int           { return len(a) }
+func (a cart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a cart) Less(i, j int) bool { return a[i].Product.Title < a[j].Product.Title }
 
+func CartHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
@@ -56,17 +62,18 @@ func CartHandler(w http.ResponseWriter, r *http.Request) {
 	mux.Lock()
 	defer mux.Unlock()
 
-	cart := []cartItem{}
+	cart := cart{}
 	for uuid, count := range carts[cartID] {
-
 		if _, ok := products[uuid]; ok {
 			cart = append(cart, cartItem{
-				Product:  products[uuid],
-				Quantity: count,
+				Product:     products[uuid],
+				Quantity:    count,
+				MoreInStock: stock[uuid] > count,
+				InStock:     stock[uuid] >= count,
 			})
 		}
-
 	}
+	sort.Sort(cart)
 
 	bytes, err := json.Marshal(cart)
 	if err != nil {
@@ -132,7 +139,7 @@ func cartProcessor(cc *pb.CartChange, msgOffset int64) error {
 	defer mux.Unlock()
 
 	if _, ok := carts[cartID]; !ok {
-		carts[cartID] = make(map[string]int)
+		carts[cartID] = make(map[string]int64)
 	}
 
 	switch cc.Action {
@@ -141,6 +148,10 @@ func cartProcessor(cc *pb.CartChange, msgOffset int64) error {
 
 	case pb.CartChangeAction_remove:
 		carts[cartID][cc.Uuid] -= 1
+	}
+
+	if carts[cartID][cc.Uuid] == 0 {
+		delete(carts[cartID], cc.Uuid)
 	}
 
 	return nil

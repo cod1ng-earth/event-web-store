@@ -15,7 +15,7 @@ import Task
 import Random
 import Http
 import Delay
-import Json.Decode as Decode exposing (Decoder, map2, map3, map8, int, float, nullable, string, field, list, decodeString)
+import Json.Decode as Decode exposing (Decoder, map2, map3, map8, int, bool, float, nullable, string, field, list, decodeString)
 import Json.Encode
 import Json.Decode.Pipeline exposing (required, optional)
 import Round exposing (round)
@@ -72,6 +72,8 @@ type alias Cart = List CartItem
 type alias CartItem =
   { product: ProductDetail
   , quantity: Int
+  , moreInStock: Bool
+  , inStock: Bool
   }
 
 type alias CartChange =
@@ -87,13 +89,14 @@ type CartAction
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
-      , content = Nothing
+      , content = Just CartPage
       , sorting = "name"
       , pageNumber = 0
       , prefix = ""
       , cart = []
       }
-    , Cmd.batch [ fetchProducts "name" 0 "", fetchCart ]
+--    , Cmd.batch [ fetchProducts "name" 0 "", fetchCart ]
+    , Cmd.batch [ fetchCart ]
     )
 
 
@@ -107,6 +110,7 @@ type Msg
     | SortByName
     | FilterByName
     | AddToCart String
+    | RemoveFromCart String
     | GotProducts (Result Http.Error ProductList)
     | GotProduct (Result Http.Error ProductDetail)
     | CartGotChanged (Result Http.Error Cart)
@@ -144,7 +148,10 @@ update msg model =
             ( { model | sorting = "prefix" }, fetchProducts "prefix" model.pageNumber model.prefix )
 
         AddToCart uuid ->
-            ( model, addToCart (CartChange Add uuid) )
+            ( model, updateCart (CartChange Add uuid) )
+
+        RemoveFromCart uuid ->
+            ( model, updateCart (CartChange Remove uuid) )
 
         GotProducts result ->
             case result of
@@ -199,14 +206,11 @@ toString error =
 view : Model -> Html Msg
 view model =
     let
-        count = String.fromInt (itemsInCart model.cart)
-
         (showingCart, showingCatalog) = case model.content of
             Just (Products pp) -> (False, True)
             Just (Product p) -> (False, False)
             Just CartPage -> (True, False)
             Nothing -> (False, False)
-
     in
     div [class "mdl-layout mdl-layout--fixed-header"]
     [ header [ class "mdl-layout__header mdl-layout__header--waterfall custom-header"]
@@ -215,7 +219,7 @@ view model =
         , div [ class "mdl-layout-spacer"] []
         , div [ class "custom-header-error"] [ text model.error ]
         , div [ class "mdl-layout-spacer"] []
-        , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" count, onClick ShowCart ] [ text "Cart" ] ]
+        , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" (itemsInCart model.cart), onClick ShowCart ] [ text "Cart" ] ]
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick ShowCart, disabled showingCart ] [ text "show Cart" ]
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts, disabled showingCatalog ] [ text "show products" ]
         ]
@@ -223,10 +227,30 @@ view model =
       , div [ class "mdl-layout__content", id "main"] [ renderContent model ]
     ]
 
-
-itemsInCart : Cart -> Int
+itemsInCart : Cart -> String
 itemsInCart cart =
-    foldl (+) 0 (List.map (\e -> 1) cart)
+    let
+        inStock = itemsInCartInStock cart
+        outOfStock = itemsInCartOutOfStock cart
+    in
+        if outOfStock == 0 then
+            String.fromInt inStock
+        else
+            String.fromInt (inStock + outOfStock) ++ "-" ++ String.fromInt outOfStock
+
+itemsInCartInStock : Cart -> Int
+itemsInCartInStock cart =
+    let
+        ls = List.map (\e -> if e.inStock then 1 else 0 ) cart
+    in
+        foldl (+) 0 ls
+        
+itemsInCartOutOfStock : Cart -> Int
+itemsInCartOutOfStock cart =
+    let
+        ls = List.map (\e -> if not e.inStock then 1 else 0 ) cart
+    in
+        foldl (+) 0 ls
 
 renderContent : Model -> Html Msg
 renderContent model =
@@ -273,8 +297,8 @@ renderProducts lst pageNumber sorting =
 sortProductsButton : Msg -> Bool -> String -> Html Msg
 sortProductsButton click grey label =
     button
-            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick click, disabled grey ]
-            [ text label ]
+        [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick click, disabled grey ]
+        [ text label ]
 
 
 showProductButton : String -> Html Msg
@@ -341,10 +365,30 @@ renderCart cart =
 
 renderCartItem : CartItem -> Html Msg
 renderCartItem item =
-    li []
-    [ span [] [ text "uuid ", text item.product.uuid ]
-    , span [] [ text "count ", text (String.fromInt item.quantity) ]
-    ]
+    let
+        uuid = item.product.uuid
+        product = item.product
+        quantity = item.quantity
+        inStock = item.inStock
+        outOfStock = not item.inStock
+        moreInStock = item.moreInStock
+        stockText = if not item.inStock then text "Out of Stock"
+                    else if not item.moreInStock then text "All stock in cart"
+                    else text ""
+    in
+        li [ class "mdl-list__item mdl-list__item--two-line" ]
+        [ span [ class "mdl-list__item-primary-content" ]
+          [ img [ class "custom-list-image",src (productImage product.uuid 100 50) ] []
+          , span [ onClick (LoadProduct product.uuid) ] [ text product.title ]
+          , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice product.price) ]
+          ]
+          , span []
+            [ stockText
+            , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick (RemoveFromCart uuid) ] [ i [ class "material-icons" ] [ text "remove" ] ]
+            , span [] [ text (String.fromInt quantity) ]
+            , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick (AddToCart uuid), disabled (not moreInStock) ] [ i [ class "material-icons" ] [ text "add" ] ]
+            ]
+        ]    
 
 fetchProducts : String -> Int -> String -> Cmd Msg
 fetchProducts sor pageNumber pre =
@@ -368,8 +412,8 @@ fetchProduct uuid =
         }
 
 
-addToCart : CartChange -> Cmd Msg
-addToCart cartChange =
+updateCart : CartChange -> Cmd Msg
+updateCart cartChange =
     Http.riskyRequest
         { method = "POST"
         , headers = []
@@ -466,3 +510,5 @@ cartItemDecoder =
     Decode.succeed CartItem
         |> required "product" productDetailDecoder
         |> required "quantity" int
+        |> required "moreInStock" bool
+        |> required "inStock" bool

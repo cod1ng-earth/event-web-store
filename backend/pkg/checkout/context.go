@@ -21,7 +21,7 @@ var (
 
 	products map[string]*pb.Product
 	stock    map[string]int64
-	carts    map[string]map[string]int
+	carts    map[string]map[string]int64
 )
 
 func init() {
@@ -29,7 +29,7 @@ func init() {
 
 	products = map[string]*pb.Product{}
 	stock = map[string]int64{}
-	carts = make(map[string]map[string]int)
+	carts = make(map[string]map[string]int64)
 }
 
 func StartCheckoutContext(brokers *[]string, cfg *cluster.Config) func() {
