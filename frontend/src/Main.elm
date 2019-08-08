@@ -32,6 +32,7 @@ type alias Model =
 type Content
   = Products Products
   | Product ProductDetail
+  | Cart
 
 type alias ProductDetail =
   { uuid:          String
@@ -75,7 +76,7 @@ init _ =
       , pageNumber = 0
       , cart = []
       }
-    , Cmd.batch [ fetchProducts "name" 0 ]
+    , Cmd.batch [ fetchProducts "name" 0, fetchCart ]
     )
 
 
@@ -140,7 +141,7 @@ update msg model =
                 Ok c ->
                     ( { model | cart = c, error = "" }, Cmd.none )
                 Err e ->
-                    ( { model | cart = [], error = toString e }, Cmd.none )
+                    ( { model | content = Nothing, error = toString e }, Cmd.none )
 
 
 toString : Http.Error -> String
@@ -164,6 +165,9 @@ toString error =
 
 view : Model -> Html Msg
 view model =
+    let
+        count = String.fromInt (itemsInCart model.cart)
+    in
     div [class "mdl-layout mdl-layout--fixed-header"]
     [ header [ class "mdl-layout__header mdl-layout__header--waterfall custom-header"]
       [ div [ class "mdl-layout__header-row custom-header-row"]
@@ -171,7 +175,7 @@ view model =
         , div [ class "mdl-layout-spacer"] []
         , div [ class "custom-header-error"] [ text model.error ]
         , div [ class "mdl-layout-spacer"] []
-        , div [] [ renderCart model.cart ]
+        , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" count ] [ text "Cart" ] ]
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts ] [ text "show products" ]
         ]
       ]
@@ -180,12 +184,6 @@ view model =
         ]
     ]
 
-renderCart : Cart -> Html Msg
-renderCart cart =
-    let
-        count = String.fromInt (itemsInCart cart)
-    in
-    span [ class "mdl-badge custom-header-cart", attribute "data-badge" count ] [ text "Cart" ]
 
 itemsInCart : Cart -> Int
 itemsInCart cart =
@@ -196,7 +194,9 @@ renderContent model =
     case model.content of
         Just (Products pp) -> renderProducts pp model.pageNumber model.sorting
         Just (Product p) -> renderProductDetail p
+        Just Cart -> renderCart model.cart
         Nothing -> text "" 
+
 
 renderProducts : Products -> Int -> String -> Html Msg
 renderProducts lst pageNumber sorting =
@@ -228,7 +228,6 @@ renderProducts lst pageNumber sorting =
     ]
 
 
-
 renderProduct : ProductOverview  -> Html Msg
 renderProduct product =
     li [ class "mdl-list__item mdl-list__item--two-line onclick" ]
@@ -237,7 +236,7 @@ renderProduct product =
       , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice product.price) ]
       ]
       , span [ class "mdl-list__item-secondary-content" ] [ addToCartButton product.uuid ]
-    ]
+    ]    
 
 formatPrice : Maybe Float -> String
 formatPrice price =
@@ -263,6 +262,18 @@ addToCartButton uuid =
       [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick (AddToCart uuid) ]
       [ text "add to cart" ]
 
+
+renderCart : Cart -> Html Msg
+renderCart cart =
+    ul [ class "product-list mdl-list" ] (List.map (\l -> renderCartItem l ) cart )
+
+renderCartItem : CartItem -> Html Msg
+renderCartItem item =
+    li []
+    [ span [] [ text "uuid ", text item.product.uuid ]
+    , span [] [ text "count ", text (String.fromInt item.quantity) ]
+    ]
+
 fetchProducts : String -> Int -> Cmd Msg
 fetchProducts sorting pageNumber =
     Http.get
@@ -284,6 +295,18 @@ addToCart cartChange =
         , headers = []
         , url = "http://localhost:8080/cart"
         , body = Http.jsonBody (encodeCartChange cartChange)
+        , expect = Http.expectJson AddedToCart cartDecoder
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+fetchCart : Cmd Msg
+fetchCart =
+    Http.riskyRequest
+        { method = "GET"
+        , headers = []
+        , url = "http://localhost:8080/cart"
+        , body = Http.emptyBody
         , expect = Http.expectJson AddedToCart cartDecoder
         , timeout = Nothing
         , tracker = Nothing

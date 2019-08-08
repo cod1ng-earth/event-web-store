@@ -51,11 +51,6 @@ func StartCartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc,
 	}
 }
 
-type cartChange struct {
-	Action string
-	Uuid   string
-}
-
 type cartItem struct {
 	Product  *pb.Product `json:"product,omitempty"`
 	Quantity int         `json:"quantity,omitempty"`
@@ -75,22 +70,6 @@ func cartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decoder := json.NewDecoder(r.Body)
-	var cc pb.CartChange
-	err := decoder.Decode(&cc)
-	if err != nil && err != io.EOF {
-		log.Printf("failed to decode cart change: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	bytes, err := proto.Marshal(&cc)
-	if err != nil {
-		log.Printf("failed to serialize cart change massage: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	cookie, err := r.Cookie("cart")
 	if err != nil {
 		expiration := time.Now().Add(365 * 24 * time.Hour)
@@ -102,31 +81,21 @@ func cartHandler(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, cookie)
 	}
 
-	cartId := cookie.Value
+	cartID := cookie.Value
 
-	msg := &sarama.ProducerMessage{
-		Topic: "cart",
-		Key:   sarama.StringEncoder(cartId),
-		Value: sarama.ByteEncoder(bytes),
+	if r.Method == "POST" {
+		err := addToCart(w, r, cartID)
+		if err != nil {
+			log.Printf("failed to add a product to the cart: %v", err)
+			return
+		}
 	}
-	_, msgOffset, err := producer.SendMessage(msg)
-	if err != nil {
-		log.Printf("failed to send cart change to kafka: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	offsetChanged.L.Lock()
-	for offset < msgOffset {
-		offsetChanged.Wait()
-	}
-	offsetChanged.L.Unlock()
 
 	mux.Lock()
 	defer mux.Unlock()
 
 	cart := []cartItem{}
-	for uuid, count := range carts[cartId] {
+	for uuid, count := range carts[cartID] {
 		cart = append(cart, cartItem{
 			Product: &pb.Product{
 				Uuid:          uuid,
@@ -142,7 +111,7 @@ func cartHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	bytes, err = json.Marshal(cart)
+	bytes, err := json.Marshal(cart)
 	if err != nil {
 		log.Printf("failed to serialize cart: %v", err)
 	}
@@ -151,6 +120,41 @@ func cartHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("failed to send result: %v", err)
 	}
+}
+
+func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
+	decoder := json.NewDecoder(r.Body)
+	var cc pb.CartChange
+	err := decoder.Decode(&cc)
+	if err != nil && err != io.EOF {
+		w.WriteHeader(http.StatusBadRequest)
+		return fmt.Errorf("failed to decode cart change: %v", err)
+	}
+
+	bytes, err := proto.Marshal(&cc)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return fmt.Errorf("failed to serialize cart change massage: %v", err)
+	}
+
+	msg := &sarama.ProducerMessage{
+		Topic: "cart",
+		Key:   sarama.StringEncoder(cartID),
+		Value: sarama.ByteEncoder(bytes),
+	}
+	_, msgOffset, err := producer.SendMessage(msg)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return fmt.Errorf("failed to send cart change to kafka: %v", err)
+	}
+
+	offsetChanged.L.Lock()
+	for offset < msgOffset {
+		offsetChanged.Wait()
+	}
+	offsetChanged.L.Unlock()
+
+	return nil
 }
 
 func cartProcessor(msg *sarama.ConsumerMessage) error {
@@ -163,20 +167,20 @@ func cartProcessor(msg *sarama.ConsumerMessage) error {
 	offset = msg.Offset
 	defer offsetChanged.Broadcast()
 
-	cartId := string(msg.Key)
+	cartID := string(msg.Key)
 
 	mux.Lock()
 	defer mux.Unlock()
 
-	if _, ok := carts[cartId]; !ok {
-		carts[cartId] = make(map[string]int)
+	if _, ok := carts[cartID]; !ok {
+		carts[cartID] = make(map[string]int)
 	}
 
 	switch cc.Action {
 	case pb.CartChangeAction_add:
-		carts[cartId][cc.Uuid] += 1
+		carts[cartID][cc.Uuid] += 1
 	case pb.CartChangeAction_remove:
-		carts[cartId][cc.Uuid] -= 1
+		carts[cartID][cc.Uuid] -= 1
 	}
 
 	return nil
