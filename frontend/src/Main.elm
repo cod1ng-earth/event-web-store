@@ -34,7 +34,7 @@ type alias Model =
 type Content
   = Products Products
   | Product ProductDetail
-  | Cart
+  | CartPage
 
 type alias ProductDetail =
   { uuid:          String
@@ -93,7 +93,8 @@ type Msg
     | AddToCart String
     | GotProducts (Result Http.Error Products)
     | GotProduct (Result Http.Error ProductDetail)
-    | AddedToCart (Result Http.Error Cart)
+    | CartGotChanged (Result Http.Error Cart)
+    | ShowCart
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -138,12 +139,15 @@ update msg model =
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
 
-        AddedToCart result ->
+        CartGotChanged result ->
             case result of
                 Ok c ->
                     ( { model | cart = c, error = "" }, Cmd.none )
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
+
+        ShowCart ->
+            ( { model | content = Just CartPage }, Cmd.none  )
 
 
 toString : Http.Error -> String
@@ -177,7 +181,7 @@ view model =
         , div [ class "mdl-layout-spacer"] []
         , div [ class "custom-header-error"] [ text model.error ]
         , div [ class "mdl-layout-spacer"] []
-        , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" count ] [ text "Cart" ] ]
+        , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" count, onClick ShowCart ] [ text "Cart" ] ]
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts ] [ text "show products" ]
         ]
       ]
@@ -194,7 +198,7 @@ renderContent model =
     case model.content of
         Just (Products pp) -> renderProducts pp model.pageNumber model.sorting
         Just (Product p) -> renderProductDetail p
-        Just Cart -> renderCart model.cart
+        Just CartPage -> renderCart model.cart
         Nothing -> text "" 
 
 
@@ -213,19 +217,27 @@ renderProducts lst pageNumber sorting =
         , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage ] [ i [ class "material-icons" ] [ text "add" ] ]
         , span [ class "custom-sorting" ]
           [ text "Sort by "
-          , button
-            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick SortByName, disabled nameDisabled ]
-            [ text "Name" ]
-          , button
-            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick SortByUuid, disabled uuidDisabled ]
-            [ text "Uuid" ]
-          , button
-            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick SortByPrice, disabled priceDisabled ]
-            [ text "Price" ]
+          , sortProductsButton SortByName nameDisabled "Name"
+          , sortProductsButton SortByUuid uuidDisabled "Uuid"
+          , sortProductsButton SortByPrice priceDisabled "Price"
           ]
         ]
         , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst )
     ]
+
+
+sortProductsButton : Msg -> Bool -> String -> Html Msg
+sortProductsButton click grey label =
+    button
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick click, disabled grey ]
+            [ text label ]
+
+
+showProductButton : String -> Html Msg
+showProductButton uuid =
+    button
+      [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick (LoadProduct uuid) ]
+      [ text "show Details" ]
 
 
 renderProduct : ProductOverview  -> Html Msg
@@ -236,20 +248,25 @@ renderProduct product =
       , span [ onClick (LoadProduct product.uuid) ] [ text product.title ]
       , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice product.price) ]
       ]
+      , span [ class "mdl-list__item-secondary-content" ] [ showProductButton product.uuid ]
       , span [ class "mdl-list__item-secondary-content" ] [ addToCartButton product.uuid ]
     ]    
+
 
 productImage : String -> Int -> Int -> String
 productImage uuid width height =
     "https://picsum.photos/id/" ++ String.fromInt (modBy 50 (reduceUuid uuid)) ++ "/" ++ String.fromInt width ++ "/" ++ String.fromInt height
 
+
 reduceUuid : String -> Int
 reduceUuid uuid =
     List.foldl (\x a -> x + a) 0 (List.map toCode (toList uuid))
 
+
 formatPrice : Maybe Float -> String
 formatPrice price =
     round 2 (Maybe.withDefault 0.0 price) ++ "€"
+
 
 renderProductDetail : ProductDetail  -> Html Msg
 renderProductDetail product =
@@ -265,6 +282,7 @@ renderProductDetail product =
       ]
     ]
 
+
 addToCartButton : String -> Html Msg
 addToCartButton uuid =
     button
@@ -275,6 +293,7 @@ addToCartButton uuid =
 renderCart : Cart -> Html Msg
 renderCart cart =
     ul [ class "product-list mdl-list" ] (List.map (\l -> renderCartItem l ) cart )
+
 
 renderCartItem : CartItem -> Html Msg
 renderCartItem item =
@@ -290,12 +309,14 @@ fetchProducts sorting pageNumber =
         , expect = Http.expectJson GotProducts productsDecoder
         }
 
+
 fetchProduct : String -> Cmd Msg
 fetchProduct uuid =
     Http.get
         { url = "http://localhost:8080/product?uuid=" ++ uuid
         , expect = Http.expectJson GotProduct productDetailDecoder
         }
+
 
 addToCart : CartChange -> Cmd Msg
 addToCart cartChange =
@@ -304,10 +325,11 @@ addToCart cartChange =
         , headers = []
         , url = "http://localhost:8080/cart"
         , body = Http.jsonBody (encodeCartChange cartChange)
-        , expect = Http.expectJson AddedToCart cartDecoder
+        , expect = Http.expectJson CartGotChanged cartDecoder
         , timeout = Nothing
         , tracker = Nothing
         }
+
 
 fetchCart : Cmd Msg
 fetchCart =
@@ -316,10 +338,11 @@ fetchCart =
         , headers = []
         , url = "http://localhost:8080/cart"
         , body = Http.emptyBody
-        , expect = Http.expectJson AddedToCart cartDecoder
+        , expect = Http.expectJson CartGotChanged cartDecoder
         , timeout = Nothing
         , tracker = Nothing
         }
+
 
 encodeCartChange : CartChange -> Json.Encode.Value
 encodeCartChange cc  =
@@ -328,6 +351,7 @@ encodeCartChange cc  =
         , ( "uuid", Json.Encode.string cc.uuid )
         ]
 
+
 cartActionToString : CartAction -> Int
 cartActionToString c =
     case c of
@@ -335,8 +359,10 @@ cartActionToString c =
       Add -> 0
       Remove -> 1
 
+
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.batch []
+
 
 main : Program () Model Msg
 main =
@@ -374,6 +400,7 @@ productDetailDecoder =
 
 cartDecoder : Decoder Cart
 cartDecoder = list cartItemDecoder
+
 
 cartItemDecoder : Decoder CartItem
 cartItemDecoder =

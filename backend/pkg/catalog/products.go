@@ -114,7 +114,6 @@ func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, fun
 	agent := simba.NewConsumer(consumer, processor)
 	go agent.Start()
 
-	offset = 0
 	products = map[string]*pb.Product{}
 
 	return Handler, agent.Stop

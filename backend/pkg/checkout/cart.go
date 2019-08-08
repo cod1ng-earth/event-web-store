@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	offset        int64
+	cartOffset    int64
 	offsetChanged *sync.Cond
 	carts         map[string]map[string]int
 	mux           sync.Mutex
@@ -27,10 +27,15 @@ var (
 func StartCartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
 
 	offsetChanged = sync.NewCond(&sync.Mutex{})
-	offset = 0
 	carts = make(map[string]map[string]int)
+	products = map[string]*pb.Product{}
 
-	consumer, err := cluster.NewConsumer(*brokers, "productdetail-cart-group", []string{"cart"}, cfg)
+	cartConsumer, err := cluster.NewConsumer(*brokers, "checkout-cart-group", []string{"cart"}, cfg)
+	if err != nil {
+		log.Panicf("failed to setup kafka consumer: %s", err)
+	}
+
+	productsConsumer, err := cluster.NewConsumer(*brokers, "checkout-products-group", []string{"products"}, cfg)
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
@@ -40,13 +45,17 @@ func StartCartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc,
 		log.Panicf("failed to setup the kafka producer: %s", err)
 	}
 
-	agent := simba.NewConsumer(consumer, cartProcessor)
-	go agent.Start()
+	cartAgent := simba.NewConsumer(cartConsumer, cartProcessor)
+	go cartAgent.Start()
+
+	productsAgent := simba.NewConsumer(productsConsumer, productsProcessor)
+	go productsAgent.Start()
 
 	return cartHandler, func() {
-		agent.Stop()
+		cartAgent.Stop()
+		productsAgent.Stop()
 		if err := producer.Close(); err != nil {
-			log.Panicf("failed to close the kafka producer: %s", err)
+			log.Printf("failed to close the kafka producer: %s", err)
 		}
 	}
 }
@@ -96,19 +105,14 @@ func cartHandler(w http.ResponseWriter, r *http.Request) {
 
 	cart := []cartItem{}
 	for uuid, count := range carts[cartID] {
-		cart = append(cart, cartItem{
-			Product: &pb.Product{
-				Uuid:          uuid,
-				Title:         "mock",
-				Description:   "mock",
-				Longtext:      "mock",
-				Category:      "mock",
-				SmallImageURL: "mock",
-				LargeImageURL: "mock",
-				Price:         0.0,
-			},
-			Quantity: count,
-		})
+
+		if _, ok := products[uuid]; ok {
+			cart = append(cart, cartItem{
+				Product:  products[uuid],
+				Quantity: count,
+			})
+		}
+
 	}
 
 	bytes, err := json.Marshal(cart)
@@ -149,7 +153,7 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 	}
 
 	offsetChanged.L.Lock()
-	for offset < msgOffset {
+	for cartOffset < msgOffset {
 		offsetChanged.Wait()
 	}
 	offsetChanged.L.Unlock()
@@ -164,7 +168,7 @@ func cartProcessor(msg *sarama.ConsumerMessage) error {
 		return fmt.Errorf("failed to unmarshal kafka cart massage %d: %v", msg.Offset, err)
 	}
 
-	offset = msg.Offset
+	cartOffset = msg.Offset
 	defer offsetChanged.Broadcast()
 
 	cartID := string(msg.Key)
