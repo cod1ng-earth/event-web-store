@@ -6,9 +6,9 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events exposing (onVisibilityChange, Visibility(..))
-import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i)
+import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img)
 import Html.Events exposing (onClick)
-import Html.Attributes exposing (href, class, id, disabled, attribute)
+import Html.Attributes exposing (href, class, id, disabled, attribute, src)
 import List exposing (foldl)
 import Time
 import Task
@@ -19,6 +19,8 @@ import Json.Decode as Decode exposing (Decoder, map2, map3, map8, int, float, nu
 import Json.Encode
 import Json.Decode.Pipeline exposing (required, optional)
 import Round exposing (round)
+import String exposing (toList)
+import Char exposing (toCode)
 
 
 type alias Model =
@@ -179,9 +181,7 @@ view model =
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts ] [ text "show products" ]
         ]
       ]
-      , div [ class "mdl-layout__content", id "main"]
-        [ div [] [ renderContent model ]
-        ]
+      , div [ class "mdl-layout__content", id "main"] [ renderContent model ]
     ]
 
 
@@ -206,8 +206,8 @@ renderProducts lst pageNumber sorting =
         priceDisabled = sorting == "price"
         nameDisabled = sorting == "name"
     in
-    div [] [
-        div [class "mdl-cell"]
+    div [ class "mdl-grid" ] [
+        div [class "mdl-cell mdl-cell--12-col"]
         [ button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick PreviousPage, disabled (not prevEnabled) ] [ i [ class "material-icons" ] [ text "remove" ] ]
         , span [ class "mdl-title custom-page-number"] [ text (" Page " ++ String.fromInt (pageNumber + 1) ++ " ")]
         , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage ] [ i [ class "material-icons" ] [ text "add" ] ]
@@ -230,13 +230,22 @@ renderProducts lst pageNumber sorting =
 
 renderProduct : ProductOverview  -> Html Msg
 renderProduct product =
-    li [ class "mdl-list__item mdl-list__item--two-line onclick" ]
+    li [ class "mdl-list__item mdl-list__item--two-line" ]
     [ span [ class "mdl-list__item-primary-content" ]
-      [ span [ onClick (LoadProduct product.uuid) ] [ text product.title ]
+      [ img [ class "custom-list-image",src (productImage product.uuid 100 50) ] []
+      , span [ onClick (LoadProduct product.uuid) ] [ text product.title ]
       , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice product.price) ]
       ]
       , span [ class "mdl-list__item-secondary-content" ] [ addToCartButton product.uuid ]
     ]    
+
+productImage : String -> Int -> Int -> String
+productImage uuid width height =
+    "https://picsum.photos/id/" ++ String.fromInt (modBy 50 (reduceUuid uuid)) ++ "/" ++ String.fromInt width ++ "/" ++ String.fromInt height
+
+reduceUuid : String -> Int
+reduceUuid uuid =
+    List.foldl (\x a -> x + a) 0 (List.map toCode (toList uuid))
 
 formatPrice : Maybe Float -> String
 formatPrice price =
@@ -244,16 +253,16 @@ formatPrice price =
 
 renderProductDetail : ProductDetail  -> Html Msg
 renderProductDetail product =
-    ol []
-    [ li [] [text product.uuid ]
-    , li [] [text product.title ]
-    , li [] [text product.description ]
-    , li [] [text product.longtext ]
-    , li [] [text product.category ]
-    , li [] [text product.smallImageURL ]
-    , li [] [text product.largeImageURL ]
-    , li [] [text (formatPrice product.price) ]
-    , addToCartButton product.uuid
+    div [ class "mdl-grid"]
+    [ div [ class "mdl-cell mdl-cell--12-col" ] [ h1 [] [ text product.title ] ]
+    , div [ class "mdl-cell mdl-cell--8-col" ] [ img [ class "custom-detail-image",src (productImage product.uuid 400 200)] [] ]
+    , div [ class "mdl-cell mdl-cell--4-col" ] 
+      [ span [ class "custom-detail-block" ] [ text ("id: " ++ product.uuid) ]
+      , span [ class "mdl-typography--headline custom-detail-block" ] [ text product.description ]
+      , span [ class "custom-detail-block" ] [ text product.longtext ]
+      , span [ class "mdl-typography--display-1 custom-detail-block" ] [ text (formatPrice product.price) ] 
+      , span [] [ addToCartButton product.uuid ] 
+      ]
     ]
 
 addToCartButton : String -> Html Msg
