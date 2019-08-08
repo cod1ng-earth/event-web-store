@@ -32,7 +32,7 @@ type alias Model =
     }
 
 type Content
-  = Products Products
+  = Products ProductList
   | Product ProductDetail
   | CartPage
 
@@ -47,7 +47,19 @@ type alias ProductDetail =
   , price:         Maybe Float
   }
 
-type alias Products = List ProductOverview
+type alias PaginatedMeta =
+  { total_items: Int
+  , total_pages: Int
+  , current_page: Int
+  , items_per_page: Int
+  }
+
+type alias ProductOverviewList = List ProductOverview
+
+type alias ProductList =
+  { data: ProductOverviewList
+  , meta: PaginatedMeta
+  }
 type alias ProductOverview =
   { uuid             : String
   , title            : String
@@ -91,7 +103,7 @@ type Msg
     | SortByPrice
     | SortByName
     | AddToCart String
-    | GotProducts (Result Http.Error Products)
+    | GotProducts (Result Http.Error ProductList)
     | GotProduct (Result Http.Error ProductDetail)
     | CartGotChanged (Result Http.Error Cart)
     | ShowCart
@@ -210,7 +222,7 @@ renderContent model =
         Nothing -> text "" 
 
 
-renderProducts : Products -> Int -> String -> Html Msg
+renderProducts : ProductList -> Int -> String -> Html Msg
 renderProducts lst pageNumber sorting =
     let
         prevEnabled = pageNumber > 0
@@ -221,7 +233,9 @@ renderProducts lst pageNumber sorting =
     div [ class "mdl-grid" ] [
         div [class "mdl-cell mdl-cell--12-col"]
         [ button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick PreviousPage, disabled (not prevEnabled) ] [ i [ class "material-icons" ] [ text "remove" ] ]
-        , span [ class "mdl-title custom-page-number"] [ text (" Page " ++ String.fromInt (pageNumber + 1) ++ " ")]
+        , span [ class "mdl-title custom-page-number"]
+          [ text (" Page " ++ String.fromInt (pageNumber + 1) ++ " from " ++ String.fromInt(lst.meta.total_pages))
+          ]
         , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage ] [ i [ class "material-icons" ] [ text "add" ] ]
         , span [ class "custom-sorting" ]
           [ text "Sort by "
@@ -230,7 +244,7 @@ renderProducts lst pageNumber sorting =
           , sortProductsButton SortByPrice priceDisabled "Price"
           ]
         ]
-        , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst )
+        , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst.data )
     ]
 
 
@@ -314,7 +328,7 @@ fetchProducts : String -> Int -> Cmd Msg
 fetchProducts sorting pageNumber =
     Http.get
         { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&page=" ++ String.fromInt pageNumber
-        , expect = Http.expectJson GotProducts productsDecoder
+        , expect = Http.expectJson GotProducts productListDecoder
         }
 
 
@@ -381,10 +395,19 @@ main =
         , subscriptions = subscriptions
         }
 
+paginatedMetaDecoder : Decoder PaginatedMeta
+paginatedMetaDecoder =
+    Decode.succeed PaginatedMeta
+        |> required "total_items" int
+        |> required "total_pages" int
+        |> required "current_page" int
+        |> required "items_per_page" int
 
-productsDecoder : Decoder Products
-productsDecoder = list productDecoder
-
+productListDecoder : Decoder ProductList
+productListDecoder = 
+    Decode.succeed ProductList
+        |> required "data" (list productDecoder)
+        |> required "meta" paginatedMetaDecoder
 
 productDecoder : Decoder ProductOverview
 productDecoder =

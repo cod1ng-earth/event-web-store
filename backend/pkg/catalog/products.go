@@ -12,13 +12,25 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
+	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 )
 
 type productsByUUID []*pb.Product
 type productsByPrice []*pb.Product
 type productsByName []*pb.Product
+
+type catalogPayloadMeta struct {
+	TotalItems   int `json:"total_items"`
+	TotalPages   int `json:"total_pages"`
+	CurrentPage  int `json:"current_page"`
+	ItemsPerPage int `json:"items_per_page"`
+}
+
+type catalogPayload struct {
+	Data []*pb.Product      `json:"data"`
+	Meta catalogPayloadMeta `json:"meta"`
+}
 
 var (
 	offset        int64
@@ -27,6 +39,10 @@ var (
 	sortedByPrice productsByPrice
 	sortedByName  productsByName
 	mux           sync.Mutex
+)
+
+const (
+	itemsPerPage = 100
 )
 
 func Min(a, b int) int {
@@ -85,10 +101,12 @@ func getProductsByName() []*pb.Product {
 	return sortedByName
 }
 
+func getPages() int {
+	return len(products) / itemsPerPage
+}
+
 func getProducts(page int, sorting string) ([]*pb.Product, error) {
-	itemsPerPage := 100
-	pages := len(products) / itemsPerPage
-	page = Max(Min(page, pages-1), 0)
+	page = Max(Min(page, getPages()-1), 0)
 	startIdx := page * itemsPerPage
 	endIdx := Min(startIdx+itemsPerPage, len(products))
 
@@ -149,7 +167,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytes, err := json.Marshal(pp)
+	payload := catalogPayload{pp, catalogPayloadMeta{len(products), getPages(), page, itemsPerPage}}
+	bytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("failed to serialize products: %v", err)
 	}
