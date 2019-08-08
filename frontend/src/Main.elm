@@ -89,14 +89,13 @@ type CartAction
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
-      , content = Just CartPage
+      , content = Nothing
       , sorting = "name"
       , currentPage = 0
       , prefix = ""
       , cart = []
       }
---    , Cmd.batch [ fetchProducts "name" 0 "", fetchCart ]
-    , Cmd.batch [ fetchCart ]
+    , Cmd.batch [ fetchProducts "name" 0 "", fetchCart ]
     )
 
 
@@ -217,13 +216,12 @@ view model =
       [ div [ class "mdl-layout__header-row custom-header-row"]
         [ span [ class "mdl-layout__title"] [ text "Event Thingy Store" ]
         , div [ class "mdl-layout-spacer"] []
-        , div [ class "custom-header-error"] [ text model.error ]
-        , div [ class "mdl-layout-spacer"] []
         , div [] [ span [ class "mdl-badge custom-header-cart", attribute "data-badge" (itemsInCart model.cart), onClick ShowCart ] [ text "Cart" ] ]
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick ShowCart, disabled showingCart ] [ text "show Cart" ]
         , button [ class "mdl-button mdl-button--raised mdl-button--accent", onClick LoadProducts, disabled showingCatalog ] [ text "show products" ]
         ]
       ]
+      , div [ class "custom-header-error"] [ text model.error ]
       , div [ class "mdl-layout__content", id "main"] [ renderContent model ]
     ]
 
