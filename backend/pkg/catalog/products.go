@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"sync"
 	"strings"
+	"sync"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
@@ -115,13 +115,13 @@ func clampPage(page int, nPages int) int {
 }
 
 func filterProducts(vs []*pb.Product, f func(*pb.Product) bool) []*pb.Product {
-    vsf := make([]*pb.Product, 0)
-    for _, v := range vs {
-        if f(v) {
-            vsf = append(vsf, v)
-        }
-    }
-    return vsf
+	vsf := make([]*pb.Product, 0)
+	for _, v := range vs {
+		if f(v) {
+			vsf = append(vsf, v)
+		}
+	}
+	return vsf
 }
 
 func getProducts(page int, sorting string, prefix string) ([]*pb.Product, int, error) {
@@ -147,7 +147,7 @@ func getProducts(page int, sorting string, prefix string) ([]*pb.Product, int, e
 	startIdx := page * itemsPerPage
 	endIdx := Min(startIdx+itemsPerPage, len(pp))
 
-	return getter()[startIdx:endIdx], len(pp), nil
+	return pp[startIdx:endIdx], len(pp), nil
 }
 
 func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {

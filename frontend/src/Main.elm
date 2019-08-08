@@ -29,6 +29,7 @@ type alias Model =
     , content : Maybe Content
     , sorting : String
     , currentPage : Int
+    , filtering : String
     , prefix : String
     , cart : Cart
     }
@@ -91,11 +92,12 @@ init _ =
     ( { error = ""
       , content = Nothing
       , sorting = "name"
+      , filtering = ""
       , currentPage = 0
       , prefix = ""
       , cart = []
       }
-    , Cmd.batch [ fetchProducts "name" 0 "", fetchCart ]
+    , Cmd.batch [ fetchProducts "name" 0 "" "", fetchCart ]
     )
 
 
@@ -107,7 +109,8 @@ type Msg
     | SortByUuid
     | SortByPrice
     | SortByName
-    | FilterByName
+    | DisableFilterByPrefix
+    | EnableFilterByPrefix
     | AddToCart String
     | RemoveFromCart String
     | GotProducts (Result Http.Error ProductList)
@@ -123,28 +126,31 @@ update msg model =
     case msg of
 
         LoadProducts ->
-            ( model, fetchProducts model.sorting model.currentPage model.prefix)
+            ( model, fetchProducts model.sorting model.currentPage model.prefix model.filtering )
 
         LoadProduct uuid ->
             ( model, fetchProduct uuid )
 
         PreviousPage ->
-            ( model, fetchProducts model.sorting (model.currentPage - 1)  model.prefix )
+            ( model, fetchProducts model.sorting (model.currentPage - 1)  model.prefix model.filtering )
 
         NextPage ->
-            ( model, fetchProducts model.sorting (model.currentPage + 1)  model.prefix )
+            ( model, fetchProducts model.sorting (model.currentPage + 1)  model.prefix model.filtering )
 
         SortByUuid ->
-            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.currentPage model.prefix )
+            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.currentPage model.prefix model.filtering )
 
         SortByPrice ->
-            ( { model | sorting = "price" }, fetchProducts "price" model.currentPage model.prefix )
+            ( { model | sorting = "price" }, fetchProducts "price" model.currentPage model.prefix model.filtering )
 
         SortByName ->
-            ( { model | sorting = "name" }, fetchProducts "name" model.currentPage model.prefix )
+            ( { model | sorting = "name" }, fetchProducts "name" model.currentPage model.prefix model.filtering )
 
-        FilterByName ->
-            ( { model | sorting = "prefix" }, fetchProducts "prefix" model.currentPage model.prefix )
+        DisableFilterByPrefix ->
+            ( { model | filtering = "" }, fetchProducts model.sorting model.currentPage model.prefix "" )
+
+        EnableFilterByPrefix ->
+            ( { model | filtering = "prefix" }, fetchProducts model.sorting model.currentPage model.prefix "prefix" )
 
         AddToCart uuid ->
             ( model, updateCart (CartChange Add uuid) )
@@ -177,10 +183,10 @@ update msg model =
             ( { model | content = Just CartPage }, Cmd.none  )
 
         GoToPage page ->
-            ( model, fetchProducts model.sorting (Maybe.withDefault 0 (String.toInt page) - 1) model.prefix )
+            ( model, fetchProducts model.sorting (Maybe.withDefault 0 (String.toInt page) - 1) model.prefix model.filtering )
 
         SetFilterPrefix prefix ->
-            ( { model | prefix = prefix }, fetchProducts model.sorting model.currentPage prefix )
+            ( { model | prefix = prefix }, fetchProducts model.sorting model.currentPage prefix model.filtering )
 
 
 toString : Http.Error -> String
@@ -253,21 +259,21 @@ itemsInCartOutOfStock cart =
 renderContent : Model -> Html Msg
 renderContent model =
     case model.content of
-        Just (Products pp) -> renderProducts pp model.sorting
+        Just (Products pp) -> renderProducts pp model.sorting model.filtering
         Just (Product p) -> renderProductDetail p
         Just CartPage -> renderCart model.cart
         Nothing -> text "" 
 
 
-renderProducts : ProductList -> String -> Html Msg
-renderProducts lst sorting =
+renderProducts : ProductList -> String -> String -> Html Msg
+renderProducts lst sorting filtering =
     let
         prevEnabled = lst.meta.currentPage > 0
         nextEnabled = lst.meta.currentPage < (lst.meta.totalPages - 1)
         uuidDisabled = sorting == "uuid"
         priceDisabled = sorting == "price"
-        nameDisabled = sorting == "name" || sorting == "prefix"
-        prefixDisabled = sorting == "prefix"
+        nameDisabled = sorting == "name"
+        prefixDisabled = filtering == "prefix"
         pagesText = if lst.meta.totalPages == 0
                     then text " No luck! "
                     else text (" Page " ++ String.fromInt (lst.meta.currentPage + 1) ++ " from " ++ String.fromInt(lst.meta.totalPages))
@@ -288,18 +294,25 @@ renderProducts lst sorting =
           ]
         , span [ class "custom-sorting" ]
           [ text "Filter by "
-          , sortProductsButton FilterByName prefixDisabled "Prefix"
+          , filterProductsButton prefixDisabled "Prefix"
           , input [ onInput SetFilterPrefix, disabled (not prefixDisabled) ] []
           ]
         ]
         , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst.data )
     ]
 
+filterProductsButton : Bool -> String -> Html Msg
+filterProductsButton active label =
+    if active then
+        button
+            [ class "mdl-button mdl-button--raised mdl-button--accent", onClick DisableFilterByPrefix ] [ text label ]
+    else button
+            [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick EnableFilterByPrefix ] [ text label ]
 
 sortProductsButton : Msg -> Bool -> String -> Html Msg
-sortProductsButton click grey label =
+sortProductsButton click inactive label =
     button
-        [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick click, disabled grey ]
+        [ class "mdl-button mdl-js-button mdl-button--raised mdl-button--colored", onClick click, disabled inactive ]
         [ text label ]
 
 
@@ -392,13 +405,10 @@ renderCartItem item =
             ]
         ]    
 
-fetchProducts : String -> Int -> String -> Cmd Msg
-fetchProducts sor currentPage pre =
+fetchProducts : String -> Int -> String -> String -> Cmd Msg
+fetchProducts sorting currentPage pre fil =
     let
-        sorting = case sor of
-            "prefix" -> "name" 
-            _ -> sor
-        prefix = percentEncode pre
+        prefix = if fil == "" then "" else percentEncode pre
     in    
     Http.get
         { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt currentPage
