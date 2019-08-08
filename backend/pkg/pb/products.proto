@@ -18,7 +18,16 @@ message ProductUpdate {
     Product new = 2;
 }
 
+message CheckoutContext {
+    oneof checkoutContext {
+        CartChange cartChange = 1;
+        Stock stock = 2;
+        ProductUpdate ProductUpdate = 3;
+    }
+}
+
 message CartChange {
+    string cartID = 3;
     string uuid = 1;
     CartChangeAction action = 2;
 }

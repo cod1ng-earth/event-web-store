@@ -37,9 +37,9 @@ func main() {
 	defer productShutdown()
 	http.HandleFunc("/product", productHandler)
 
-	cartHandler, cartShutdown := checkout.StartCartHandler(brokerList, config)
-	defer cartShutdown()
-	http.HandleFunc("/cart", cartHandler)
+	shutdown := checkout.StartCheckoutContext(brokerList, config)
+	defer shutdown()
+	http.HandleFunc("/cart", checkout.CartHandler)
 
 	log.Println("listening on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

@@ -16,7 +16,6 @@ import (
 
 var (
 	brokerList  = kingpin.Flag("brokerList", "List of brokers to connect").Default("localhost:9092").Strings()
-	topic       = kingpin.Flag("topic", "Topic name").Default("stock").String()
 	currentPath = kingpin.Arg("current", "path to current import file").Required().String()
 )
 
@@ -69,12 +68,17 @@ func importStock(stocks map[string][]string, ch chan<- *sarama.ProducerMessage) 
 }
 
 func sendUpdate(ch chan<- *sarama.ProducerMessage, msg *pb.Stock) error {
-	bytes, err := proto.Marshal(msg)
+	change := &pb.CheckoutContext{
+		CheckoutContext: &pb.CheckoutContext_Stock{
+			Stock: msg,
+		},
+	}
+	bytes, err := proto.Marshal(change)
 	if err != nil {
 		return fmt.Errorf("failed to serialize product delete massage: %s", err)
 	}
 	ch <- &sarama.ProducerMessage{
-		Topic: *topic,
+		Topic: "checkout",
 		Key:   sarama.StringEncoder(msg.Uuid),
 		Value: sarama.ByteEncoder(bytes),
 	}

@@ -6,66 +6,19 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 )
-
-var (
-	cartOffset    int64
-	offsetChanged *sync.Cond
-	carts         map[string]map[string]int
-	mux           sync.Mutex
-	producer      sarama.SyncProducer
-)
-
-func StartCartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
-
-	offsetChanged = sync.NewCond(&sync.Mutex{})
-	carts = make(map[string]map[string]int)
-	products = map[string]*pb.Product{}
-
-	cartConsumer, err := cluster.NewConsumer(*brokers, "checkout-cart-group", []string{"cart"}, cfg)
-	if err != nil {
-		log.Panicf("failed to setup kafka consumer: %s", err)
-	}
-
-	productsConsumer, err := cluster.NewConsumer(*brokers, "checkout-products-group", []string{"products"}, cfg)
-	if err != nil {
-		log.Panicf("failed to setup kafka consumer: %s", err)
-	}
-
-	producer, err = sarama.NewSyncProducer(*brokers, &cfg.Config)
-	if err != nil {
-		log.Panicf("failed to setup the kafka producer: %s", err)
-	}
-
-	cartAgent := simba.NewConsumer(cartConsumer, cartProcessor)
-	go cartAgent.Start()
-
-	productsAgent := simba.NewConsumer(productsConsumer, productsProcessor)
-	go productsAgent.Start()
-
-	return cartHandler, func() {
-		cartAgent.Stop()
-		productsAgent.Stop()
-		if err := producer.Close(); err != nil {
-			log.Printf("failed to close the kafka producer: %s", err)
-		}
-	}
-}
 
 type cartItem struct {
 	Product  *pb.Product `json:"product,omitempty"`
 	Quantity int         `json:"quantity,omitempty"`
 }
 
-func cartHandler(w http.ResponseWriter, r *http.Request) {
+func CartHandler(w http.ResponseWriter, r *http.Request) {
 	//	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000|http://localhost:8080")
 	//	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Set-Cookie")
 
@@ -135,14 +88,21 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 		return fmt.Errorf("failed to decode cart change: %v", err)
 	}
 
-	bytes, err := proto.Marshal(&cc)
+	cc.CartID = cartID
+
+	change := &pb.CheckoutContext{
+		CheckoutContext: &pb.CheckoutContext_CartChange{
+			CartChange: &cc,
+		},
+	}
+	bytes, err := proto.Marshal(change)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("failed to serialize cart change massage: %v", err)
 	}
 
 	msg := &sarama.ProducerMessage{
-		Topic: "cart",
+		Topic: "checkout",
 		Key:   sarama.StringEncoder(cartID),
 		Value: sarama.ByteEncoder(bytes),
 	}
@@ -153,7 +113,7 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 	}
 
 	offsetChanged.L.Lock()
-	for cartOffset < msgOffset {
+	for offset < msgOffset {
 		offsetChanged.Wait()
 	}
 	offsetChanged.L.Unlock()
@@ -161,17 +121,12 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 	return nil
 }
 
-func cartProcessor(msg *sarama.ConsumerMessage) error {
-	cc := pb.CartChange{}
-	err := proto.Unmarshal(msg.Value, &cc)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka cart massage %d: %v", msg.Offset, err)
-	}
+func cartProcessor(cc *pb.CartChange, msgOffset int64) error {
 
-	cartOffset = msg.Offset
+	offset = msgOffset
 	defer offsetChanged.Broadcast()
 
-	cartID := string(msg.Key)
+	cartID := cc.CartID
 
 	mux.Lock()
 	defer mux.Unlock()
@@ -183,6 +138,7 @@ func cartProcessor(msg *sarama.ConsumerMessage) error {
 	switch cc.Action {
 	case pb.CartChangeAction_add:
 		carts[cartID][cc.Uuid] += 1
+
 	case pb.CartChangeAction_remove:
 		carts[cartID][cc.Uuid] -= 1
 	}

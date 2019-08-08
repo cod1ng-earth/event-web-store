@@ -4,15 +4,11 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 )
 
-func productsProcessor(p *pb.ProductUpdate) error {
+func stockProcessor(s *pb.Stock) error {
 	mux.Lock()
 	defer mux.Unlock()
 
-	if p.New == nil {
-		delete(products, p.Old.Uuid)
-	} else {
-		products[p.New.Uuid] = p.New
-	}
+	stock[s.Uuid] += s.Quantity
 
 	return nil
 }
