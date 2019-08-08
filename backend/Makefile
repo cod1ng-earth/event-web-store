@@ -23,10 +23,10 @@ pkg/pb/products.pb.go: pkg/pb/products.proto
 	protoc --go_out=. pkg/pb/products.proto
 
 ab:
-	ab -c 20 -n 200000 -k http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710
+	ab -c 4 -n 200000 -k http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710
 
-results.bin:
-	echo "GET http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710" | vegeta attack -workers=20 -max-workers=20 -rate=0 -duration=5s > results.bin
+results.bin: $(shell find cmd pkg Makfile -type f)
+	echo "GET http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710" | vegeta attack -workers=4 -max-workers=4 -rate=0 -duration=5s > results.bin
 
 hdrplot: results.bin
 	vegeta report --type hdrplot results.bin
