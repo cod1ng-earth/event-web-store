@@ -1,2 +1,4 @@
 tmp
 *.csv
+results.bin
+plot.html

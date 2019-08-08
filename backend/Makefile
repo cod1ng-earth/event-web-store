@@ -11,10 +11,10 @@ update: products-1.csv products-2.csv
 	go run ./cmd/csv-import/main.go products-2.csv products-1.csv
 
 products-1.csv:
-	go run ./cmd/csv-fake-create/main.go > products-1.csv
+	go run ./cmd/csv-fake-create/main.go -seed=0 > products-1.csv
 
 products-2.csv: products-1.csv
-	cat products-1.csv | go run ./cmd/csv-fake-alternate/main.go > products-2.csv
+	cat products-1.csv | go run ./cmd/csv-fake-alternate/main.go -seed=1 > products-2.csv
 
 lint:
 	golangci-lint run -e ./vendor ./...
@@ -22,12 +22,15 @@ lint:
 pkg/pb/products.pb.go: pkg/pb/products.proto
 	protoc --go_out=. pkg/pb/products.proto
 
-benchmark:
-	echo "GET http://localhost:8080/product?uuid=1d9d1c51-cc0a-48e0-80b5-00d2ded65791" | vegeta attack -workers=1 -max-workers=1 -name=1workers -rate=5000 -duration=15s > ~/results.bin
+ab:
+	ab -c 20 -n 200000 -k http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710
 
-hdrplot:
-	vegeta report --type hdrplot ~/results.bin
+results.bin:
+	echo "GET http://localhost:8080/product?uuid=e412bd86-6381-4c90-8365-3219d6115710" | vegeta attack -workers=20 -max-workers=20 -rate=0 -duration=5s > results.bin
 
-plot:
-	vegeta plot ~/results.bin > plot.html
+hdrplot: results.bin
+	vegeta report --type hdrplot results.bin
+
+plot: results.bin
+	vegeta plot results.bin > plot.html
 	google-chrome plot.html
