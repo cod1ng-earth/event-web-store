@@ -21,6 +21,7 @@ import Json.Decode.Pipeline exposing (required, optional)
 import Round exposing (round)
 import String exposing (toList)
 import Char exposing (toCode)
+import Url exposing (percentEncode)
 
 
 type alias Model =
@@ -28,6 +29,7 @@ type alias Model =
     , content : Maybe Content
     , sorting : String
     , pageNumber : Int
+    , prefix : String
     , cart : Cart
     }
 
@@ -88,9 +90,10 @@ init _ =
       , content = Nothing
       , sorting = "name"
       , pageNumber = 0
+      , prefix = ""
       , cart = []
       }
-    , Cmd.batch [ fetchProducts "name" 0, fetchCart ]
+    , Cmd.batch [ fetchProducts "name" 0 "", fetchCart ]
     )
 
 
@@ -102,12 +105,14 @@ type Msg
     | SortByUuid
     | SortByPrice
     | SortByName
+    | FilterByName
     | AddToCart String
     | GotProducts (Result Http.Error ProductList)
     | GotProduct (Result Http.Error ProductDetail)
     | CartGotChanged (Result Http.Error Cart)
     | ShowCart
     | GoToPage String
+    | SetFilterPrefix String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -115,25 +120,28 @@ update msg model =
     case msg of
 
         LoadProducts ->
-            ( model, fetchProducts model.sorting model.pageNumber)
+            ( model, fetchProducts model.sorting model.pageNumber model.prefix)
 
         LoadProduct uuid ->
             ( model, fetchProduct uuid )
 
         PreviousPage ->
-            ( model, fetchProducts model.sorting (model.pageNumber - 1)  )
+            ( model, fetchProducts model.sorting (model.pageNumber - 1)  model.prefix )
 
         NextPage ->
-            ( model, fetchProducts model.sorting (model.pageNumber + 1) )
+            ( model, fetchProducts model.sorting (model.pageNumber + 1)  model.prefix )
 
         SortByUuid ->
-            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.pageNumber  )
+            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.pageNumber model.prefix )
 
         SortByPrice ->
-            ( { model | sorting = "price" }, fetchProducts "price" model.pageNumber  )
+            ( { model | sorting = "price" }, fetchProducts "price" model.pageNumber model.prefix )
 
         SortByName ->
-            ( { model | sorting = "name" }, fetchProducts "name" model.pageNumber  )
+            ( { model | sorting = "name" }, fetchProducts "name" model.pageNumber model.prefix )
+
+        FilterByName ->
+            ( { model | sorting = "prefix" }, fetchProducts "prefix" model.pageNumber model.prefix )
 
         AddToCart uuid ->
             ( model, addToCart (CartChange Add uuid) )
@@ -163,7 +171,10 @@ update msg model =
             ( { model | content = Just CartPage }, Cmd.none  )
 
         GoToPage page ->
-            ( model, fetchProducts model.sorting (Maybe.withDefault 0 (String.toInt page) - 1) )
+            ( model, fetchProducts model.sorting (Maybe.withDefault 0 (String.toInt page) - 1) model.prefix )
+
+        SetFilterPrefix prefix ->
+            ( model, fetchProducts model.sorting model.pageNumber model.prefix )
 
 
 toString : Http.Error -> String
@@ -232,7 +243,8 @@ renderProducts lst pageNumber sorting =
         prevEnabled = pageNumber > 0
         uuidDisabled = sorting == "uuid"
         priceDisabled = sorting == "price"
-        nameDisabled = sorting == "name"
+        nameDisabled = sorting == "name" || sorting == "prefix"
+        prefixDisabled = sorting == "prefix"
     in
     div [ class "mdl-grid" ] [
         div [class "mdl-cell mdl-cell--12-col"]
@@ -247,6 +259,11 @@ renderProducts lst pageNumber sorting =
           , sortProductsButton SortByName nameDisabled "Name"
           , sortProductsButton SortByUuid uuidDisabled "Uuid"
           , sortProductsButton SortByPrice priceDisabled "Price"
+          ]
+        , span [ class "custom-sorting" ]
+          [ text "Filter by "
+          , sortProductsButton FilterByName prefixDisabled "Prefix"
+          , input [ onInput SetFilterPrefix, disabled (not prefixDisabled) ] []
           ]
         ]
         , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst.data )
@@ -329,10 +346,16 @@ renderCartItem item =
     , span [] [ text "count ", text (String.fromInt item.quantity) ]
     ]
 
-fetchProducts : String -> Int -> Cmd Msg
-fetchProducts sorting pageNumber =
+fetchProducts : String -> Int -> String -> Cmd Msg
+fetchProducts sor pageNumber pre =
+    let
+        sorting = case sor of
+            "prefix" -> "name" 
+            _ -> sor
+        prefix = percentEncode pre
+    in    
     Http.get
-        { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&page=" ++ String.fromInt pageNumber
+        { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt pageNumber
         , expect = Http.expectJson GotProducts productListDecoder
         }
 
