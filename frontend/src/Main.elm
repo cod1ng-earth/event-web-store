@@ -28,7 +28,7 @@ type alias Model =
     { error : String
     , content : Maybe Content
     , sorting : String
-    , pageNumber : Int
+    , currentPage : Int
     , prefix : String
     , cart : Cart
     }
@@ -50,10 +50,10 @@ type alias ProductDetail =
   }
 
 type alias PaginatedMeta =
-  { total_items: Int
-  , total_pages: Int
-  , current_page: Int
-  , items_per_page: Int
+  { totalItems: Int
+  , totalPages: Int
+  , currentPage: Int
+  , itemsPerPage: Int
   }
 
 type alias ProductOverviewList = List ProductOverview
@@ -91,7 +91,7 @@ init _ =
     ( { error = ""
       , content = Just CartPage
       , sorting = "name"
-      , pageNumber = 0
+      , currentPage = 0
       , prefix = ""
       , cart = []
       }
@@ -124,28 +124,28 @@ update msg model =
     case msg of
 
         LoadProducts ->
-            ( model, fetchProducts model.sorting model.pageNumber model.prefix)
+            ( model, fetchProducts model.sorting model.currentPage model.prefix)
 
         LoadProduct uuid ->
             ( model, fetchProduct uuid )
 
         PreviousPage ->
-            ( model, fetchProducts model.sorting (model.pageNumber - 1)  model.prefix )
+            ( model, fetchProducts model.sorting (model.currentPage - 1)  model.prefix )
 
         NextPage ->
-            ( model, fetchProducts model.sorting (model.pageNumber + 1)  model.prefix )
+            ( model, fetchProducts model.sorting (model.currentPage + 1)  model.prefix )
 
         SortByUuid ->
-            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.pageNumber model.prefix )
+            ( { model | sorting = "uuid" }, fetchProducts "uuid" model.currentPage model.prefix )
 
         SortByPrice ->
-            ( { model | sorting = "price" }, fetchProducts "price" model.pageNumber model.prefix )
+            ( { model | sorting = "price" }, fetchProducts "price" model.currentPage model.prefix )
 
         SortByName ->
-            ( { model | sorting = "name" }, fetchProducts "name" model.pageNumber model.prefix )
+            ( { model | sorting = "name" }, fetchProducts "name" model.currentPage model.prefix )
 
         FilterByName ->
-            ( { model | sorting = "prefix" }, fetchProducts "prefix" model.pageNumber model.prefix )
+            ( { model | sorting = "prefix" }, fetchProducts "prefix" model.currentPage model.prefix )
 
         AddToCart uuid ->
             ( model, updateCart (CartChange Add uuid) )
@@ -156,7 +156,7 @@ update msg model =
         GotProducts result ->
             case result of
                 Ok pp ->
-                    ( { model | content = Just (Products pp), pageNumber = pp.meta.current_page, error = "" }, Cmd.none )
+                    ( { model | content = Just (Products pp), currentPage = pp.meta.currentPage, error = "" }, Cmd.none )
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
 
@@ -181,7 +181,7 @@ update msg model =
             ( model, fetchProducts model.sorting (Maybe.withDefault 0 (String.toInt page) - 1) model.prefix )
 
         SetFilterPrefix prefix ->
-            ( model, fetchProducts model.sorting model.pageNumber model.prefix )
+            ( { model | prefix = prefix }, fetchProducts model.sorting model.currentPage prefix )
 
 
 toString : Http.Error -> String
@@ -255,29 +255,33 @@ itemsInCartOutOfStock cart =
 renderContent : Model -> Html Msg
 renderContent model =
     case model.content of
-        Just (Products pp) -> renderProducts pp model.pageNumber model.sorting
+        Just (Products pp) -> renderProducts pp model.sorting
         Just (Product p) -> renderProductDetail p
         Just CartPage -> renderCart model.cart
         Nothing -> text "" 
 
 
-renderProducts : ProductList -> Int -> String -> Html Msg
-renderProducts lst pageNumber sorting =
+renderProducts : ProductList -> String -> Html Msg
+renderProducts lst sorting =
     let
-        prevEnabled = pageNumber > 0
+        prevEnabled = lst.meta.currentPage > 0
+        nextEnabled = lst.meta.currentPage < (lst.meta.totalPages - 1)
         uuidDisabled = sorting == "uuid"
         priceDisabled = sorting == "price"
         nameDisabled = sorting == "name" || sorting == "prefix"
         prefixDisabled = sorting == "prefix"
+        pagesText = if lst.meta.totalPages == 0
+                    then text " No luck! "
+                    else text (" Page " ++ String.fromInt (lst.meta.currentPage + 1) ++ " from " ++ String.fromInt(lst.meta.totalPages))
     in
     div [ class "mdl-grid" ] [
         div [class "mdl-cell mdl-cell--12-col"]
         [ button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick PreviousPage, disabled (not prevEnabled) ] [ i [ class "material-icons" ] [ text "remove" ] ]
         , span [ class "mdl-title custom-page-number"]
-          [ text (" Page " ++ String.fromInt (pageNumber + 1) ++ " from " ++ String.fromInt(lst.meta.total_pages))
+          [ pagesText
           , input [ class "custom-go-to-page", placeholder "Go to page", onInput GoToPage ] []
           ]
-        , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage ] [ i [ class "material-icons" ] [ text "add" ] ]
+        , button [ class "mdl-button mdl-js-button mdl-button--fab mdl-button--colored", onClick NextPage, disabled (not nextEnabled) ] [ i [ class "material-icons" ] [ text "add" ] ]
         , span [ class "custom-sorting" ]
           [ text "Sort by "
           , sortProductsButton SortByName nameDisabled "Name"
@@ -391,7 +395,7 @@ renderCartItem item =
         ]    
 
 fetchProducts : String -> Int -> String -> Cmd Msg
-fetchProducts sor pageNumber pre =
+fetchProducts sor currentPage pre =
     let
         sorting = case sor of
             "prefix" -> "name" 
@@ -399,7 +403,7 @@ fetchProducts sor pageNumber pre =
         prefix = percentEncode pre
     in    
     Http.get
-        { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt pageNumber
+        { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt currentPage
         , expect = Http.expectJson GotProducts productListDecoder
         }
 

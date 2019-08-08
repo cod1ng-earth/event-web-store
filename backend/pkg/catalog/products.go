@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"strings"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
@@ -101,29 +102,52 @@ func getProductsByName() []*pb.Product {
 	return sortedByName
 }
 
-func getPages() int {
-	return len(products) / itemsPerPage
+func getPageNumber(nItems int) int {
+	n := nItems / itemsPerPage
+	if (nItems % itemsPerPage) != 0 {
+		n++
+	}
+	return n
 }
 
-func clampPage(page int) int {
-	return Max(Min(page, getPages()-1), 0)
+func clampPage(page int, nPages int) int {
+	return Max(Min(page, nPages-1), 0)
 }
 
-func getProducts(page int, sorting string) ([]*pb.Product, error) {
-	page = clampPage(page)
-	startIdx := page * itemsPerPage
-	endIdx := Min(startIdx+itemsPerPage, len(products))
+func filterProducts(vs []*pb.Product, f func(*pb.Product) bool) []*pb.Product {
+    vsf := make([]*pb.Product, 0)
+    for _, v := range vs {
+        if f(v) {
+            vsf = append(vsf, v)
+        }
+    }
+    return vsf
+}
 
+func getProducts(page int, sorting string, prefix string) ([]*pb.Product, int, error) {
+	var getter func() []*pb.Product
 	switch sorting {
 	case "uuid":
-		return getProductsByUUID()[startIdx:endIdx], nil
+		getter = getProductsByUUID
 	case "price":
-		return getProductsByPrice()[startIdx:endIdx], nil
+		getter = getProductsByPrice
 	case "name":
-		return getProductsByName()[startIdx:endIdx], nil
+		getter = getProductsByName
 	default:
-		return nil, fmt.Errorf("sorting %s unknown", sorting)
+		return nil, 0, fmt.Errorf("sorting %s unknown", sorting)
 	}
+	pp := getter()
+	if prefix != "" {
+		pp = filterProducts(pp, func(p *pb.Product) bool {
+			return strings.HasPrefix(p.Title, prefix)
+		})
+	}
+
+	page = clampPage(page, getPageNumber(len(pp)))
+	startIdx := page * itemsPerPage
+	endIdx := Min(startIdx+itemsPerPage, len(pp))
+
+	return getter()[startIdx:endIdx], len(pp), nil
 }
 
 func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
@@ -155,6 +179,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sortParam = "uuid"
 	}
 
+	prefixParam := r.URL.Query().Get("prefix")
+
 	page, err := strconv.Atoi(pageParam)
 	if err != nil {
 		log.Printf("failed to parse page param: %v\n", err)
@@ -164,14 +190,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	mux.Lock()
 	defer mux.Unlock()
-	pp, err := getProducts(page, sortParam)
+	pp, totalItems, err := getProducts(page, sortParam, prefixParam)
 	if err != nil {
 		log.Printf("failed to get products: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	totalPages := getPageNumber(totalItems)
+	currentPage := clampPage(page, totalPages)
 
-	payload := catalogPayload{pp, catalogPayloadMeta{len(products), getPages(), clampPage(page), itemsPerPage}}
+	payload := catalogPayload{pp, catalogPayloadMeta{totalItems, totalPages, currentPage, itemsPerPage}}
 	bytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("failed to serialize products: %v", err)
