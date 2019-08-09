@@ -6,8 +6,8 @@ help: ### Display this help text.
 setup: clean ### Stop and remove all containers, networks and volumes. (Re)build all images. Import products into Kafka.
 	docker-compose build
 	docker-compose up --detach kafka
-	docker-compose run --rm backend-golang bash -euo pipefail -c 'echo "Waiting for Kafka... "; while ! nc -z kafka 9093; do sleep 1; done; echo "Kafka is ready!"'
-	docker-compose run --rm backend-golang bash -euo pipefail -c 'make products-1.csv && make import'
+	docker-compose run --rm backend bash -euo pipefail -c 'echo "Waiting for Kafka... "; while ! nc -z kafka 9093; do sleep 1; done; echo "Kafka is ready!"'
+	docker-compose run --rm backend bash -euo pipefail -c 'make products-1.csv && make import'
 .PHONY: setup
 
 start: ### Start all containers, networks and volumes in the background.
