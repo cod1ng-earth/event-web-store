@@ -31,10 +31,33 @@ services:
       - 'kafka_data:/bitnami'
     environment:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTAINER://kafka:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTAINER://kafka:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTAINER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       - zookeeper
+  backend-golang:
+    build:
+      context: backend
+      dockerfile: ../docker/backend/Dockerfile
+    depends_on:
+      - kafka
+    environment: 
+      - BROKER_LIST=kafka:9093
+    ports:
+      - '8080:8080'
+    restart: unless-stopped
+    volumes:
+      - ./backend:/go/src/app:rw,cached
+  frontend-elm:
+    build:
+      context: frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./frontend:/app:rw,cached
 
 volumes:
   zookeeper_data:
