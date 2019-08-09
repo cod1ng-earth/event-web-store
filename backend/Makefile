@@ -72,11 +72,14 @@ results.bin: $(shell find cmd pkg -type f) Makefile
 	echo "GET ${URL}" | vegeta attack -workers=4 -max-workers=4 -rate=0 -duration=5s > results.bin
 
 hdrplot: results.bin ##@benchmark show latency histogram
-	vegeta report --type hdrplot results.bin
+	vegeta report -type hdrplot results.bin
 
 plot: results.bin ##@benchmark show latency ploy
 	vegeta plot results.bin > plot.html
 	google-chrome plot.html
+
+report: results.bin ##@benchmark show vegeta report
+	vegeta report -type text results.bin
 
 break: ##@network Slow down local network
 	sudo tc qdisc add dev lo root netem delay 14ms
