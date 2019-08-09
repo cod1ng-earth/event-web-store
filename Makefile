@@ -8,6 +8,7 @@ setup: clean ### Stop and remove all containers, networks and volumes. (Re)build
 	docker-compose up --detach kafka
 	docker-compose run --rm backend bash -euo pipefail -c 'echo "Waiting for Kafka... "; while ! nc -z kafka 9093; do sleep 1; done; echo "Kafka is ready!"'
 	docker-compose run --rm backend bash -euo pipefail -c 'make stock'
+	docker-compose down
 .PHONY: setup
 
 start: ### Start all containers, networks and volumes in the background.
