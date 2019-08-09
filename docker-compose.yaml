@@ -16,6 +16,7 @@ services:
       - 'zookeeper_data:/bitnami'
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    user: '65535'
   kafka:
     cap_drop: [ALL]
     networks:
@@ -37,7 +38,9 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       - zookeeper
+    user: '65535'
   backend:
+    cap_drop: [ALL]
     build:
       context: backend
       dockerfile: ../docker/backend/Dockerfile
@@ -47,6 +50,7 @@ services:
       - BROKER_LIST=kafka:9093
     ports:
       - '8080:8080'
+    read_only: true
     restart: unless-stopped
     volumes:
       - ./backend/cmd:/go/src/app/cmd:ro,cached
@@ -54,16 +58,20 @@ services:
       - ./backend/air.conf:/go/src/app/air.conf:ro,cached
       - ./backend/go.mod:/go/src/app/go.mod:ro,cached
       - ./backend/go.sum:/go/src/app/go.sum:ro,cached
+    #user: '65535'
   frontend:
+    cap_drop: [ALL]
     build:
       context: frontend
       dockerfile: ../docker/frontend/Dockerfile
     ports:
       - '8000:8000'
+    read_only: true
     volumes:
       - ./frontend/dist:/app/dist:rw,cached
       - ./frontend/src:/app/src:ro,cached
       - ./frontend/elm.json:/app/elm.json:ro,cached
+    #user: '65535'
 
 volumes:
   zookeeper_data:

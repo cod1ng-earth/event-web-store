@@ -1,4 +1,9 @@
 FROM golang:1.12.7-alpine3.10
+# These are so-called anonymous volumes.
+# The rest of the container's file-system can be read-only
+# e.g via Docker Compose's 'read_only: true'
+# or Kubernetes' pod security policy 'ReadOnlyRootFilesystem'
+VOLUME ["/go/src/app/tmp", "/tmp", "/root/.cache/go-build"]
 RUN set -euxo pipefail; \
     apk add --no-cache \
     bash=~5.0 \
@@ -16,4 +21,5 @@ COPY go.sum go.sum
 RUN set -euxo pipefail; \
     GO111MODULE=on go mod download
 COPY . .
+#USER 65635
 CMD [ "make", "start" ]
