@@ -4,9 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/catalog"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/product"
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/products"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -29,15 +28,12 @@ func main() {
 	config.Producer.Flush.MaxMessages = 500
 	config.Producer.Return.Successes = true
 
-	catalogHandler, catalogShutdown := catalog.StartHandler(brokerList, config)
-	defer catalogShutdown()
-	http.HandleFunc("/products", catalogHandler)
+	shutdown := products.StartContext(brokerList, config)
+	defer shutdown()
+	http.HandleFunc("/product", products.PDPHandler)
+	http.HandleFunc("/products", products.CatalogHandler)
 
-	productHandler, productShutdown := product.StartHandler(brokerList, config)
-	defer productShutdown()
-	http.HandleFunc("/product", productHandler)
-
-	shutdown := checkout.StartCheckoutContext(brokerList, config)
+	shutdown = checkout.StartContext(brokerList, config)
 	defer shutdown()
 	http.HandleFunc("/cart", checkout.CartHandler)
 	http.HandleFunc("/orderCart", checkout.OrderHandler)

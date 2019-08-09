@@ -1,4 +1,4 @@
-package catalog
+package products
 
 import (
 	"encoding/json"
@@ -8,13 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
-	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	"github.com/golang/protobuf/proto"
 )
 
 type productsByUUID []*pb.Product
@@ -34,17 +29,69 @@ type catalogPayload struct {
 }
 
 var (
-	offset        int64
-	products      map[string]*pb.Product
 	sortedByUUID  productsByUUID
 	sortedByPrice productsByPrice
 	sortedByName  productsByName
-	mux           sync.Mutex
 )
 
 const (
 	itemsPerPage = 100
 )
+
+func CatalogHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
+	w.Header().Set("Content-Type", "application/json")
+	//	fmt.Fprintf(w, "offset: %d", offset)
+	pageParam := r.URL.Query().Get("page")
+	if pageParam == "" {
+		pageParam = "0"
+	}
+
+	sortParam := r.URL.Query().Get("sort")
+	if sortParam == "" {
+		sortParam = "uuid"
+	}
+
+	prefixParam := r.URL.Query().Get("prefix")
+
+	page, err := strconv.Atoi(pageParam)
+	if err != nil {
+		log.Printf("failed to parse page param: %v\n", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	mux.Lock()
+	defer mux.Unlock()
+	pp, totalItems, err := getProducts(page, sortParam, prefixParam)
+	if err != nil {
+		log.Printf("failed to get products: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	totalPages := getPageNumber(totalItems)
+	currentPage := clampPage(page, totalPages)
+
+	ppMini := []*pb.Product{}
+	for _, p := range pp {
+		ppMini = append(ppMini, &pb.Product{
+			Uuid:  p.Uuid,
+			Title: p.Title,
+			Price: p.Price,
+		})
+	}
+
+	payload := catalogPayload{ppMini, catalogPayloadMeta{totalItems, totalPages, currentPage, itemsPerPage}}
+	bytes, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("failed to serialize products: %v", err)
+	}
+
+	_, err = w.Write(bytes)
+	if err != nil {
+		log.Printf("failed to send result: %v", err)
+	}
+}
 
 func Min(a, b int) int {
 	if a < b {
@@ -148,95 +195,4 @@ func getProducts(page int, sorting string, prefix string) ([]*pb.Product, int, e
 	endIdx := Min(startIdx+itemsPerPage, len(pp))
 
 	return pp[startIdx:endIdx], len(pp), nil
-}
-
-func StartHandler(brokers *[]string, cfg *cluster.Config) (http.HandlerFunc, func()) {
-
-	consumer, err := cluster.NewConsumer(*brokers, "catalog-consumer-group", []string{"products"}, cfg)
-	if err != nil {
-		log.Panicf("failed to setup kafka consumer: %s", err)
-	}
-
-	agent := simba.NewConsumer(consumer, processor)
-	go agent.Start()
-
-	products = map[string]*pb.Product{}
-
-	return Handler, agent.Stop
-}
-
-func Handler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
-	w.Header().Set("Content-Type", "application/json")
-	//	fmt.Fprintf(w, "offset: %d", offset)
-	pageParam := r.URL.Query().Get("page")
-	if pageParam == "" {
-		pageParam = "0"
-	}
-
-	sortParam := r.URL.Query().Get("sort")
-	if sortParam == "" {
-		sortParam = "uuid"
-	}
-
-	prefixParam := r.URL.Query().Get("prefix")
-
-	page, err := strconv.Atoi(pageParam)
-	if err != nil {
-		log.Printf("failed to parse page param: %v\n", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	mux.Lock()
-	defer mux.Unlock()
-	pp, totalItems, err := getProducts(page, sortParam, prefixParam)
-	if err != nil {
-		log.Printf("failed to get products: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	totalPages := getPageNumber(totalItems)
-	currentPage := clampPage(page, totalPages)
-
-	payload := catalogPayload{pp, catalogPayloadMeta{totalItems, totalPages, currentPage, itemsPerPage}}
-	bytes, err := json.Marshal(payload)
-	if err != nil {
-		log.Printf("failed to serialize products: %v", err)
-	}
-
-	_, err = w.Write(bytes)
-	if err != nil {
-		log.Printf("failed to send result: %v", err)
-	}
-}
-
-func processor(msg *sarama.ConsumerMessage) error {
-	p := pb.ProductUpdate{}
-	err := proto.Unmarshal(msg.Value, &p)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka product massage %d: %v", msg.Offset, err)
-	}
-
-	offset = msg.Offset
-	//	log.Printf("offset: %d", offset)
-
-	UUID := string(msg.Key)
-
-	mux.Lock()
-	defer mux.Unlock()
-	if p.New == nil {
-		delete(products, UUID)
-	} else {
-		products[UUID] = &pb.Product{
-			Uuid:  p.New.Uuid,
-			Title: p.New.Title,
-			Price: p.New.Price,
-		}
-	}
-	sortedByUUID = nil
-	sortedByPrice = nil
-	sortedByName = nil
-
-	return nil
 }

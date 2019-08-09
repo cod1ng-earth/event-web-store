@@ -34,7 +34,7 @@ func init() {
 	orders = make(map[string]map[string]int64)
 }
 
-func StartCheckoutContext(brokers *[]string, cfg *cluster.Config) func() {
+func StartContext(brokers *[]string, cfg *cluster.Config) func() {
 
 	consumer, err := cluster.NewConsumer(*brokers, "checkout-cart-group", []string{"checkout"}, cfg)
 	if err != nil {
