@@ -96,15 +96,16 @@ type alias OrderStatus =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { error = ""
-      , content = Just CartPage
+      , content = Nothing
+--      , content = Just CartPage
       , sorting = "name"
       , filtering = ""
       , currentPage = 0
       , prefix = ""
       , cart = []
       }
---    , Cmd.batch [ fetchProducts "name" 0 "" "", fetchCart ]
-    , Cmd.batch [ fetchCart ]
+    , Cmd.batch [ fetchProducts "name" 0 "" "", fetchCart ]
+--    , Cmd.batch [ fetchCart ]
     )
 
 
@@ -194,11 +195,8 @@ update msg model =
         CartGotOrdered result ->
             case result of
                 Ok c ->
-                    let
-                        cont = if c.status == "success" then Just OrderSuccess
-                               else Just OrderFailure
-                    in
-                    ( { model | content = cont, cart = [], error = "" }, Cmd.none )
+                    if c.status == "success" then ( { model | content = Just OrderSuccess, cart = [], error = "" }, Cmd.none )
+                    else ( { model | content = Just OrderFailure, cart = [], error = "" }, Cmd.none )
                 Err e ->
                     ( { model | error = toString e }, Cmd.none )
 
