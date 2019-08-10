@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/drhodes/golorem"
-	"github.com/satori/go.uuid"
+	lorem "github.com/drhodes/golorem"
+	uuid "github.com/satori/go.uuid"
 )
 
 func main() {
@@ -38,7 +38,17 @@ func main() {
 }
 
 func newRow() []string {
-	UUID := uuid.NewV4()
+	bb := make([]byte, uuid.Size)
+	rand.Read(bb)
+	_, err := rand.Read(bb)
+	if err != nil {
+		log.Panicf("failed to generate random bytes: %v", err)
+	}
+	UUID, err := uuid.FromBytes(bb)
+	if err != nil {
+		log.Panicf("failed to transform bytes to uuid: %v", err)
+	}
+
 	price := float64(rand.Intn(10000)) / 100
 	return []string{
 		UUID.String(),

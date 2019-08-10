@@ -30,7 +30,7 @@ help: ##@other Show this help.
 
 export GO111MODULE=on
 
-URL = "http://localhost:8080/product?uuid=4aa3dfe0-0f9a-4a37-8efc-52f0e6a4f56b"
+URL = "http://localhost:8080/product?uuid=6e4ff95f-f662-a5ee-e82a-bdf44a2d0b75"
 
 start: ##@develop Start the backend
 	air -c air.conf
