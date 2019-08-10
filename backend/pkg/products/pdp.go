@@ -11,8 +11,8 @@ func PDPHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	//	fmt.Fprintf(w, "offset: %d", offset)
 
-	mux.Lock()
-	defer mux.Unlock()
+	mut.RLock()
+	defer mut.RUnlock()
 
 	uuid := r.FormValue("uuid")
 	if uuid == "" {

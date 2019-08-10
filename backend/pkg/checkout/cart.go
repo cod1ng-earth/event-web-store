@@ -59,8 +59,8 @@ func CartHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	mux.Lock()
-	defer mux.Unlock()
+	mut.RLock()
+	defer mut.RUnlock()
 
 	cart := cart{}
 	for uuid, count := range carts[cartID] {
@@ -135,8 +135,8 @@ func cartProcessor(cc *pb.CartChange, msgOffset int64) error {
 
 	cartID := cc.CartID
 
-	mux.Lock()
-	defer mux.Unlock()
+	mut.Lock()
+	defer mut.Unlock()
 
 	if _, ok := carts[cartID]; !ok {
 		carts[cartID] = make(map[string]int64)

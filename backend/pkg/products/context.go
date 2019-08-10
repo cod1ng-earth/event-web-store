@@ -8,14 +8,14 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
+	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 )
 
 var (
 	offset   int64
 	products map[string]*pb.Product
-	mux      sync.Mutex
+	mut      sync.RWMutex
 )
 
 func init() {
@@ -48,8 +48,8 @@ func processor(msg *sarama.ConsumerMessage) error {
 
 	UUID := string(msg.Key)
 
-	mux.Lock()
-	defer mux.Unlock()
+	mut.Lock()
+	defer mut.Unlock()
 	if p.New == nil {
 		delete(products, UUID)
 	} else {

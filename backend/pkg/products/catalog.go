@@ -61,8 +61,8 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mux.Lock()
-	defer mux.Unlock()
+	mut.RLock()
+	defer mut.RUnlock()
 	pp, totalItems, err := getProducts(page, sortParam, prefixParam)
 	if err != nil {
 		log.Printf("failed to get products: %v", err)

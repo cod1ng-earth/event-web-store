@@ -5,8 +5,8 @@ import (
 )
 
 func stockProcessor(s *pb.Stock) error {
-	mux.Lock()
-	defer mux.Unlock()
+	mut.Lock()
+	defer mut.Unlock()
 
 	stock[s.Uuid] += s.Quantity
 

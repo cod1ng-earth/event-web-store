@@ -5,8 +5,8 @@ import (
 )
 
 func productsProcessor(p *pb.ProductUpdate) error {
-	mux.Lock()
-	defer mux.Unlock()
+	mut.Lock()
+	defer mut.Unlock()
 
 	if p.New == nil {
 		delete(products, p.Old.Uuid)

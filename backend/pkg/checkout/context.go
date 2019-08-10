@@ -8,12 +8,12 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
+	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 )
 
 var (
-	mux           sync.Mutex
+	mut           sync.RWMutex
 	offset        int64
 	offsetChanged *sync.Cond
 

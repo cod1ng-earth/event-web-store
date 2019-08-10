@@ -43,8 +43,8 @@ func OrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mux.Lock()
-	defer mux.Unlock()
+	mut.RLock()
+	defer mut.RUnlock()
 
 	_, isOrdered := orders[cartID]
 
@@ -111,8 +111,8 @@ func orderCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 }
 
 func ordersProcessor(p *pb.CartOrder, msgOffset int64) {
-	mux.Lock()
-	defer mux.Unlock()
+	mut.Lock()
+	defer mut.Unlock()
 
 	offset = msgOffset
 	defer offsetChanged.Broadcast()
