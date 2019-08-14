@@ -78,7 +78,7 @@ func OrderHandler(w http.ResponseWriter, r *http.Request) {
 func orderCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 
 	change := &pb.CheckoutContext{
-		CheckoutContext: &pb.CheckoutContext_CartOrder{
+		CheckoutContextMsg: &pb.CheckoutContext_CartOrder{
 			CartOrder: &pb.CartOrder{
 				CartID: cartID,
 			},

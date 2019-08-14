@@ -16,6 +16,7 @@
             "elm/random": "1.0.0",
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
+            "eriktim/elm-protocol-buffers": "1.1.0",
             "myrho/elm-round": "1.0.4"
         },
         "indirect": {

@@ -1,8 +1,6 @@
 package products
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -10,189 +8,170 @@ import (
 	"strings"
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
+	"github.com/golang/protobuf/proto"
 )
 
-type productsByUUID []*pb.Product
-type productsByPrice []*pb.Product
-type productsByName []*pb.Product
-
-type catalogPayloadMeta struct {
-	TotalItems   int `json:"total_items"`
-	TotalPages   int `json:"total_pages"`
-	CurrentPage  int `json:"current_page"`
-	ItemsPerPage int `json:"items_per_page"`
+type catalogPage struct {
+	Data []*pb.Product       `json:"data"`
+	Meta catalogPageMetadata `json:"meta"`
 }
 
-type catalogPayload struct {
-	Data []*pb.Product      `json:"data"`
-	Meta catalogPayloadMeta `json:"meta"`
+type catalogPageMetadata struct {
+	TotalItems   int    `json:"total_items"`
+	TotalPages   int    `json:"total_pages"`
+	CurrentPage  int    `json:"current_page"`
+	SetPageTo    int    `json:"set_page_to"`
+	ItemsPerPage int    `json:"items_per_page"`
+	Sorting      string `json:"sorting"`
+	Filtering    string `json:"filtering"`
 }
 
-var (
-	sortedByUUID  productsByUUID
-	sortedByPrice productsByPrice
-	sortedByName  productsByName
-)
+func (c *context) NewCatalogHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
 
-const (
-	itemsPerPage = 100
-)
-
-func CatalogHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
-	w.Header().Set("Content-Type", "application/json")
-	//	fmt.Fprintf(w, "offset: %d", offset)
-	pageParam := r.URL.Query().Get("page")
-	if pageParam == "" {
-		pageParam = "0"
-	}
-
-	sortParam := r.URL.Query().Get("sort")
-	if sortParam == "" {
-		sortParam = "uuid"
-	}
-
-	prefixParam := r.URL.Query().Get("prefix")
-
-	page, err := strconv.Atoi(pageParam)
-	if err != nil {
-		log.Printf("failed to parse page param: %v\n", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	mut.RLock()
-	defer mut.RUnlock()
-	pp, totalItems, err := getProducts(page, sortParam, prefixParam)
-	if err != nil {
-		log.Printf("failed to get products: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	totalPages := getPageNumber(totalItems)
-	currentPage := clampPage(page, totalPages)
-
-	ppMini := []*pb.Product{}
-	for _, p := range pp {
-		ppMini = append(ppMini, &pb.Product{
-			Uuid:  p.Uuid,
-			Title: p.Title,
-			Price: p.Price,
-		})
-	}
-
-	payload := catalogPayload{ppMini, catalogPayloadMeta{totalItems, totalPages, currentPage, itemsPerPage}}
-	bytes, err := json.Marshal(payload)
-	if err != nil {
-		log.Printf("failed to serialize products: %v", err)
-	}
-
-	_, err = w.Write(bytes)
-	if err != nil {
-		log.Printf("failed to send result: %v", err)
-	}
-}
-
-func Min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func Max(a, b int) int {
-	if a < b {
-		return b
-	}
-	return a
-}
-
-func (a productsByUUID) Len() int           { return len(a) }
-func (a productsByUUID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a productsByUUID) Less(i, j int) bool { return a[i].Uuid < a[j].Uuid }
-
-func (a productsByPrice) Len() int           { return len(a) }
-func (a productsByPrice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a productsByPrice) Less(i, j int) bool { return a[i].Price < a[j].Price }
-
-func (a productsByName) Len() int           { return len(a) }
-func (a productsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a productsByName) Less(i, j int) bool { return a[i].Title < a[j].Title }
-
-func getProductsByUUID() []*pb.Product {
-	if sortedByUUID == nil {
-		for _, v := range products {
-			sortedByUUID = append(sortedByUUID, v)
+		itemsPerPageInt, err := strconv.Atoi(r.URL.Query().Get("itemsPerPage"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
-		sort.Sort(sortedByUUID)
-	}
-	return sortedByUUID
-}
-
-func getProductsByPrice() []*pb.Product {
-	if sortedByPrice == nil {
-		for _, v := range products {
-			sortedByPrice = append(sortedByPrice, v)
+		itemsPerPage := int64(itemsPerPageInt)
+		sort := r.URL.Query().Get("sort")
+		prefix := r.URL.Query().Get("prefix")
+		pageInt, err := strconv.Atoi(r.URL.Query().Get("page"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
-		sort.Sort(sortedByPrice)
-	}
-	return sortedByPrice
-}
+		page := int64(pageInt)
 
-func getProductsByName() []*pb.Product {
-	if sortedByName == nil {
-		for _, v := range products {
-			sortedByName = append(sortedByName, v)
+		model, close := c.read()
+		defer close()
+		pp := loadProducts(sort, prefix, model)
+
+		totalItems := int64(len(pp))
+		totalPages := calculateTotalPages(totalItems, itemsPerPage)
+		newPage := calculatePage(page, totalPages)
+
+		startIdx := newPage * itemsPerPage
+		endIdx := startIdx + itemsPerPage
+		//		log.Printf("startIdx %v, endIdx %v, totalItems %v", startIdx, endIdx, totalItems)
+		if endIdx > totalItems {
+			endIdx = totalItems
 		}
-		sort.Sort(sortedByName)
+		pp = pp[startIdx:endIdx]
+
+		products := []*pb.Product{}
+		for _, p := range pp {
+			products = append(products, &pb.Product{
+				Uuid:  p.Uuid,
+				Title: p.Title,
+				Price: p.Price,
+			})
+		}
+
+		payload := &pb.CatalogPage{
+			Products:     products,
+			TotalItems:   totalItems,
+			TotalPages:   totalPages,
+			CurrentPage:  page,
+			SetPageTo:    newPage,
+			Sorting:      sort,
+			Filtering:    prefix,
+			ItemsPerPage: itemsPerPage,
+		}
+
+		//		respondJson(w, payload)
+		w.Header().Set("Content-Type", "application/protobuf")
+
+		bytes, err := proto.Marshal(payload)
+		if err != nil {
+			log.Printf("failed to serialize: %v", err)
+		}
+
+		_, err = w.Write(bytes)
+		if err != nil {
+			log.Printf("failed to send result: %v", err)
+		}
 	}
-	return sortedByName
 }
 
-func getPageNumber(nItems int) int {
-	n := nItems / itemsPerPage
-	if (nItems % itemsPerPage) != 0 {
+func loadProducts(sorting string, prefix string, m *model) []*pb.Product {
+	if prefix != "" {
+		pp := m.sortedByTitle
+		startIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title >= prefix })
+		pp = pp[startIdx:]
+		//		endrunes := []rune(prefix)
+		//		endrunes[len(endrunes)-1]++
+		//		end := string(endrunes)
+		endIdx := sort.Search(len(pp), func(i int) bool { return !strings.HasPrefix(pp[i].Title, prefix) })
+		pp = pp[:endIdx]
+		//	pp := m.sortedByTitle
+		//	startIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title >= prefix })
+		//	//pp = pp[startIdx:]
+		//	endIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title > prefix })
+		//	//pp = pp[:endIdx]
+
+		//log.Printf("startIdx: %v endIdx: %v, prefix: %v", startIdx, startIdx+endIdx, prefix)
+		//		log.Printf("%s", pp[startIdx])
+		//		log.Printf("%v", pp[endIdx].Title >= prefix)
+		//		log.Printf("%v", pp[endIdx+1].Title >= prefix)
+		//		log.Printf("%v", pp[endIdx].Title >= prefix)
+		//		log.Printf("%v", pp[endIdx+1].Title >= prefix)
+		//
+
+		//log.Printf("%s - %s - %s", m.sortedByTitle[startIdx+endIdx-1].Title, m.sortedByTitle[startIdx+endIdx].Title, m.sortedByTitle[startIdx+endIdx+1].Title)
+
+		switch sorting {
+		case "uuid":
+			ppp := productsByUUID{}
+			for _, v := range pp {
+				log.Println(v.Title)
+				ppp = append(ppp, v)
+			}
+			sort.Sort(ppp)
+		case "price":
+			ppp := productsByPrice{}
+			for _, v := range pp {
+				log.Println(v.Title)
+				ppp = append(ppp, v)
+			}
+			sort.Sort(ppp)
+		case "name":
+			return pp
+		default:
+			log.Printf("sorting %s unknown", sorting)
+		}
+	}
+
+	switch sorting {
+	case "uuid":
+		return m.sortedByUUID
+	case "price":
+		return m.sortedByPrice
+	case "name":
+		return m.sortedByTitle
+	default:
+		log.Printf("sorting %s unknown", sorting)
+	}
+
+	return []*pb.Product{}
+}
+
+func calculatePage(page, totalPages int64) int64 {
+	if page > totalPages-1 {
+		page = totalPages - 1
+	}
+	if page < 0 {
+		page = 0
+	}
+	return page
+}
+
+func calculateTotalPages(totalItems, itemsPerPage int64) int64 {
+	n := totalItems / itemsPerPage
+	if (totalItems % itemsPerPage) != 0 {
 		n++
 	}
 	return n
-}
-
-func clampPage(page int, nPages int) int {
-	return Max(Min(page, nPages-1), 0)
-}
-
-func filterProducts(vs []*pb.Product, f func(*pb.Product) bool) []*pb.Product {
-	vsf := make([]*pb.Product, 0)
-	for _, v := range vs {
-		if f(v) {
-			vsf = append(vsf, v)
-		}
-	}
-	return vsf
-}
-
-func getProducts(page int, sorting string, prefix string) ([]*pb.Product, int, error) {
-	var getter func() []*pb.Product
-	switch sorting {
-	case "uuid":
-		getter = getProductsByUUID
-	case "price":
-		getter = getProductsByPrice
-	case "name":
-		getter = getProductsByName
-	default:
-		return nil, 0, fmt.Errorf("sorting %s unknown", sorting)
-	}
-	pp := getter()
-	if prefix != "" {
-		pp = filterProducts(pp, func(p *pb.Product) bool {
-			return strings.HasPrefix(p.Title, prefix)
-		})
-	}
-
-	page = clampPage(page, getPageNumber(len(pp)))
-	startIdx := page * itemsPerPage
-	endIdx := Min(startIdx+itemsPerPage, len(pp))
-
-	return pp[startIdx:endIdx], len(pp), nil
 }

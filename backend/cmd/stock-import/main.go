@@ -69,7 +69,7 @@ func importStock(stocks map[string][]string, ch chan<- *sarama.ProducerMessage) 
 
 func sendUpdate(ch chan<- *sarama.ProducerMessage, msg *pb.Stock) error {
 	change := &pb.CheckoutContext{
-		CheckoutContext: &pb.CheckoutContext_Stock{
+		CheckoutContextMsg: &pb.CheckoutContext_Stock{
 			Stock: msg,
 		},
 	}

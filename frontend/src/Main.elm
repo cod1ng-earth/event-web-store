@@ -22,6 +22,11 @@ import Round exposing (round)
 import String exposing (toList)
 import Char exposing (toCode)
 import Url exposing (percentEncode)
+-- import Products
+
+import Pb
+import Protobuf.Decode as PbDecode
+import Protobuf.Encode as PbEncode
 
 
 type alias Model =
@@ -35,7 +40,7 @@ type alias Model =
     }
 
 type Content
-  = Products ProductList
+  = Products Pb.CatalogPage
   | Product ProductDetail
   | CartPage
   | OrderSuccess
@@ -122,7 +127,7 @@ type Msg
     | AddToCart String
     | RemoveFromCart String
     | OrderCart
-    | GotProducts (Result Http.Error ProductList)
+    | GotProducts (Result Http.Error Pb.CatalogPage)
     | GotProduct (Result Http.Error ProductDetail)
     | CartGotChanged (Result Http.Error Cart)
     | CartGotOrdered (Result Http.Error OrderStatus)
@@ -174,7 +179,7 @@ update msg model =
         GotProducts result ->
             case result of
                 Ok pp ->
-                    ( { model | content = Just (Products pp), currentPage = pp.meta.currentPage, error = "" }, Cmd.none )
+                    ( { model | content = Just (Products pp), currentPage = pp.currentPage, error = "" }, Cmd.none )
                 Err e ->
                     ( { model | content = Nothing, error = toString e }, Cmd.none )
 
@@ -290,18 +295,18 @@ renderContent model =
         Nothing -> text "" 
 
 
-renderProducts : ProductList -> String -> String -> Html Msg
-renderProducts lst sorting filtering =
+renderProducts : Pb.CatalogPage -> String -> String -> Html Msg
+renderProducts cp sorting filtering =
     let
-        prevEnabled = lst.meta.currentPage > 0
-        nextEnabled = lst.meta.currentPage < (lst.meta.totalPages - 1)
+        prevEnabled = cp.currentPage > 0
+        nextEnabled = cp.currentPage < (cp.totalPages - 1)
         uuidDisabled = sorting == "uuid"
         priceDisabled = sorting == "price"
         nameDisabled = sorting == "name"
         prefixDisabled = filtering == "prefix"
-        pagesText = if lst.meta.totalPages == 0
+        pagesText = if cp.totalPages == 0
                     then text " No luck! "
-                    else text (" Page " ++ String.fromInt (lst.meta.currentPage + 1) ++ " from " ++ String.fromInt(lst.meta.totalPages))
+                    else text (" Page " ++ String.fromInt (cp.currentPage + 1) ++ " from " ++ String.fromInt(cp.totalPages))
     in
     div [ class "mdl-grid" ] [
         div [class "mdl-cell mdl-cell--12-col"]
@@ -323,7 +328,7 @@ renderProducts lst sorting filtering =
           , input [ onInput SetFilterPrefix, disabled (not prefixDisabled) ] []
           ]
         ]
-        , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) lst.data )
+        , ul [ class "product-list mdl-list" ] (List.map (\l -> renderProduct l ) cp.products )
     ]
 
 filterProductsButton : Bool -> String -> Html Msg
@@ -348,13 +353,13 @@ showProductButton uuid =
       [ text "show Details" ]
 
 
-renderProduct : ProductOverview  -> Html Msg
+renderProduct : Pb.Product  -> Html Msg
 renderProduct product =
     li [ class "mdl-list__item mdl-list__item--two-line" ]
     [ span [ class "mdl-list__item-primary-content" ]
       [ img [ class "custom-list-image",src (productImage product.uuid 100 50) ] []
       , span [ onClick (LoadProduct product.uuid) ] [ text product.title ]
-      , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice product.price) ]
+      , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice (Just product.price)) ]
       ]
       , span [ class "mdl-list__item-secondary-content" ] [ showProductButton product.uuid ]
       , span [ class "mdl-list__item-secondary-content" ] [ addToCartButton product.uuid ]
@@ -440,8 +445,9 @@ fetchProducts sorting currentPage pre fil =
         prefix = if fil == "" then "" else percentEncode pre
     in    
     Http.get
-        { url = "http://localhost:8080/products?sort=" ++ sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt currentPage
-        , expect = Http.expectJson GotProducts productListDecoder
+        { url = "http://localhost:8080/products?itemsPerPage=100&sort=" ++ sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt currentPage
+--        , expect = Http.expectJson GotProducts productListDecoder
+        , expect = PbDecode.expectBytes GotProducts Pb.catalogPageDecoder
         }
 
 

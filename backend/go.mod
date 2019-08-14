@@ -9,6 +9,7 @@ require (
 	github.com/bsm/sarama-cluster v2.1.15+incompatible
 	github.com/drhodes/golorem v0.0.0-20160418191928-ecccc744c2d9
 	github.com/golang/protobuf v1.3.2
+	github.com/hashicorp/golang-lru v0.5.3
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect

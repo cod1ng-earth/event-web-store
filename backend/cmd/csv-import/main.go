@@ -145,7 +145,7 @@ func remove(prevProducts map[string][]string, ch chan<- *sarama.ProducerMessage)
 
 func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *pb.ProductUpdate) error {
 	change := &pb.CheckoutContext{
-		CheckoutContext: &pb.CheckoutContext_ProductUpdate{
+		CheckoutContextMsg: &pb.CheckoutContext_ProductUpdate{
 			ProductUpdate: msg,
 		},
 	}

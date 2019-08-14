@@ -7,7 +7,6 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/products"
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -20,20 +19,21 @@ func main() {
 
 	kingpin.Parse()
 
-	config := cluster.NewConfig()
+	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
-	config.Group.Return.Notifications = true
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Flush.MaxMessages = 500
 	config.Producer.Return.Successes = true
 
-	shutdown := products.StartContext(brokerList, config)
-	defer shutdown()
-	http.HandleFunc("/product", products.PDPHandler)
-	http.HandleFunc("/products", products.CatalogHandler)
+	prd := products.NewContext(brokerList, config)
+	go prd.Start()
+	defer prd.Stop()
+	prd.AwaitLastOffset()
+	http.HandleFunc("/product", prd.NewPDPHandler())
+	http.HandleFunc("/products", prd.NewCatalogHandler())
 
-	shutdown = checkout.StartContext(brokerList, config)
+	shutdown := checkout.StartContext(brokerList, config)
 	defer shutdown()
 	http.HandleFunc("/cart", checkout.CartHandler)
 	http.HandleFunc("/orderCart", checkout.OrderHandler)

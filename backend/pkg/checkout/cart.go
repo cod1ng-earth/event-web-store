@@ -98,7 +98,7 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 	cc.CartID = cartID
 
 	change := &pb.CheckoutContext{
-		CheckoutContext: &pb.CheckoutContext_CartChange{
+		CheckoutContextMsg: &pb.CheckoutContext_CartChange{
 			CartChange: &cc,
 		},
 	}

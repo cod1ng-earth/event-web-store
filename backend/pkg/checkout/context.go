@@ -8,8 +8,11 @@ import (
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
+)
+
+const (
+	Topic = "checkout"
 )
 
 var (
@@ -34,19 +37,23 @@ func init() {
 	orders = make(map[string]map[string]int64)
 }
 
-func StartContext(brokers *[]string, cfg *cluster.Config) func() {
+func StartContext(brokers *[]string, cfg *sarama.Config) func() {
 
-	consumer, err := cluster.NewConsumer(*brokers, "checkout-cart-group", []string{"checkout"}, cfg)
+	consumer, err := sarama.NewConsumer(*brokers, cfg)
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
+	partition, err := consumer.ConsumePartition(Topic, 0, 0)
+	if err != nil {
+		log.Panicf("failed to setup kafka patition: %s", err)
+	}
 
-	producer, err = sarama.NewSyncProducer(*brokers, &cfg.Config)
+	producer, err = sarama.NewSyncProducer(*brokers, cfg)
 	if err != nil {
 		log.Panicf("failed to setup the kafka producer: %s", err)
 	}
 
-	agent := simba.NewConsumer(consumer, checkoutProcessor)
+	agent := simba.NewConsumer(consumer, partition, checkoutProcessor)
 	go agent.Start()
 
 	return func() {
@@ -66,7 +73,7 @@ func checkoutProcessor(msg *sarama.ConsumerMessage) error {
 
 	defer func() { offset = msg.Offset }()
 
-	switch x := cc.GetCheckoutContext().(type) {
+	switch x := cc.GetCheckoutContextMsg().(type) {
 
 	case *pb.CheckoutContext_CartChange:
 		if err := cartProcessor(cc.GetCartChange(), offset); err != nil {
