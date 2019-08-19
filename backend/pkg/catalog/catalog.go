@@ -1,30 +1,15 @@
-package products
+package catalog
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/golang/protobuf/proto"
 )
-
-type catalogPage struct {
-	Data []*pb.Product       `json:"data"`
-	Meta catalogPageMetadata `json:"meta"`
-}
-
-type catalogPageMetadata struct {
-	TotalItems   int    `json:"total_items"`
-	TotalPages   int    `json:"total_pages"`
-	CurrentPage  int    `json:"current_page"`
-	SetPageTo    int    `json:"set_page_to"`
-	ItemsPerPage int    `json:"items_per_page"`
-	Sorting      string `json:"sorting"`
-	Filtering    string `json:"filtering"`
-}
 
 func (c *context) NewCatalogHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +22,9 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 		}
 		itemsPerPage := int64(itemsPerPageInt)
 		sort := r.URL.Query().Get("sort")
+		if sort == "" {
+			sort = "uuid"
+		}
 		prefix := r.URL.Query().Get("prefix")
 		pageInt, err := strconv.Atoi(r.URL.Query().Get("page"))
 		if err != nil {
@@ -47,7 +35,11 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 
 		model, close := c.read()
 		defer close()
-		pp := loadProducts(sort, prefix, model)
+		pp, err := loadProducts(sort, prefix, model)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		totalItems := int64(len(pp))
 		totalPages := calculateTotalPages(totalItems, itemsPerPage)
@@ -61,16 +53,16 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 		}
 		pp = pp[startIdx:endIdx]
 
-		products := []*pb.Product{}
+		products := []*Product{}
 		for _, p := range pp {
-			products = append(products, &pb.Product{
-				Uuid:  p.Uuid,
+			products = append(products, &Product{
+				Id:    p.Id,
 				Title: p.Title,
 				Price: p.Price,
 			})
 		}
 
-		payload := &pb.CatalogPage{
+		payload := &CatalogPage{
 			Products:     products,
 			TotalItems:   totalItems,
 			TotalPages:   totalPages,
@@ -96,66 +88,40 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 	}
 }
 
-func loadProducts(sorting string, prefix string, m *model) []*pb.Product {
+func loadProducts(sorting string, prefix string, m *model) ([]*Product, error) {
 	if prefix != "" {
 		pp := m.sortedByTitle
 		startIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title >= prefix })
 		pp = pp[startIdx:]
-		//		endrunes := []rune(prefix)
-		//		endrunes[len(endrunes)-1]++
-		//		end := string(endrunes)
 		endIdx := sort.Search(len(pp), func(i int) bool { return !strings.HasPrefix(pp[i].Title, prefix) })
 		pp = pp[:endIdx]
-		//	pp := m.sortedByTitle
-		//	startIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title >= prefix })
-		//	//pp = pp[startIdx:]
-		//	endIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title > prefix })
-		//	//pp = pp[:endIdx]
-
-		//log.Printf("startIdx: %v endIdx: %v, prefix: %v", startIdx, startIdx+endIdx, prefix)
-		//		log.Printf("%s", pp[startIdx])
-		//		log.Printf("%v", pp[endIdx].Title >= prefix)
-		//		log.Printf("%v", pp[endIdx+1].Title >= prefix)
-		//		log.Printf("%v", pp[endIdx].Title >= prefix)
-		//		log.Printf("%v", pp[endIdx+1].Title >= prefix)
-		//
-
-		//log.Printf("%s - %s - %s", m.sortedByTitle[startIdx+endIdx-1].Title, m.sortedByTitle[startIdx+endIdx].Title, m.sortedByTitle[startIdx+endIdx+1].Title)
 
 		switch sorting {
 		case "uuid":
-			ppp := productsByUUID{}
-			for _, v := range pp {
-				log.Println(v.Title)
-				ppp = append(ppp, v)
-			}
+			ppp := make(productsByUUID, len(pp))
+			copy(ppp, pp)
 			sort.Sort(ppp)
+			return ppp, nil
 		case "price":
-			ppp := productsByPrice{}
-			for _, v := range pp {
-				log.Println(v.Title)
-				ppp = append(ppp, v)
-			}
+			ppp := make(productsByPrice, len(pp))
+			copy(ppp, pp)
 			sort.Sort(ppp)
+			return ppp, nil
 		case "name":
-			return pp
-		default:
-			log.Printf("sorting %s unknown", sorting)
+			return pp, nil
 		}
 	}
 
 	switch sorting {
 	case "uuid":
-		return m.sortedByUUID
+		return m.sortedByUUID, nil
 	case "price":
-		return m.sortedByPrice
+		return m.sortedByPrice, nil
 	case "name":
-		return m.sortedByTitle
-	default:
-		log.Printf("sorting %s unknown", sorting)
+		return m.sortedByTitle, nil
 	}
 
-	return []*pb.Product{}
+	return []*Product{}, fmt.Errorf("sorting %s unknown", sorting)
 }
 
 func calculatePage(page, totalPages int64) int64 {

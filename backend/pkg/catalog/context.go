@@ -1,4 +1,4 @@
-package products
+package catalog
 
 import (
 	"log"
@@ -15,22 +15,13 @@ const (
 )
 
 type context struct {
-	locklessModel locklessModel
-
 	doneCh    chan struct{}
 	client    sarama.Client
 	consumer  sarama.Consumer
 	partition sarama.PartitionConsumer
 
-	batchUpdates      func(*sarama.ConsumerMessage, locklessModel) error
-	batchFinalizer    func(*model)
-	realtimeUpdates   func(*sarama.ConsumerMessage, locklessModel) error
-	realtimeFinalizer func(*model)
+	batchOffset int64
 
-	realtimeOffset int64
-}
-
-type locklessModel struct {
 	readerAChanged *sync.Cond
 	readerBChanged *sync.Cond
 	aIsReading     bool
@@ -39,9 +30,8 @@ type locklessModel struct {
 	modelA         *model
 	modelB         *model
 
-	doneCh     chan struct{}
-	writes     chan func(*model) int64
-	writesRedo chan func(*model) int64
+	writes     chan *sarama.ConsumerMessage
+	writesRedo chan *sarama.ConsumerMessage
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -62,38 +52,32 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
 
-	realtimeOffset, err := client.GetOffset(Topic, Partition, sarama.OffsetNewest)
+	batchOffset, err := client.GetOffset(Topic, Partition, sarama.OffsetNewest)
 	if err != nil {
 		log.Printf("failed to get last offset for topic %v partition %v", Topic, Partition)
 	}
+	batchOffset--
+
+	//	batchOffset -= 50000
 
 	context := context{
-		locklessModel: locklessModel{
-			aIsReading:     true,
-			modelA:         newModel(),
-			modelB:         newModel(),
-			offsetChanged:  sync.NewCond(&sync.Mutex{}),
-			readerAChanged: sync.NewCond(&sync.Mutex{}),
-			readerBChanged: sync.NewCond(&sync.Mutex{}),
-			writes:         make(chan func(*model) int64, 32768),
-			writesRedo:     make(chan func(*model) int64, 32768),
-		},
+		doneCh:    make(chan struct{}, 1),
+		client:    client,
+		consumer:  consumer,
+		partition: partition,
 
-		doneCh:            make(chan struct{}, 1),
-		client:            client,
-		consumer:          consumer,
-		partition:         partition,
-		batchUpdates:      modelBatchUpdates,
-		batchFinalizer:    modelBatchFinalizer,
-		realtimeUpdates:   modelRealtimeUpdates,
-		realtimeFinalizer: modelRealtimeFinalizer,
-		realtimeOffset:    realtimeOffset,
+		batchOffset: batchOffset,
+
+		aIsReading:     true,
+		modelA:         newModel(),
+		modelB:         newModel(),
+		offsetChanged:  sync.NewCond(&sync.Mutex{}),
+		readerAChanged: sync.NewCond(&sync.Mutex{}),
+		readerBChanged: sync.NewCond(&sync.Mutex{}),
+		writes:         make(chan *sarama.ConsumerMessage, 32768),
+		writesRedo:     make(chan *sarama.ConsumerMessage, 32768),
 	}
 	return context
-}
-
-func (l *locklessModel) Stop() {
-	close(l.writes)
 }
 
 func (c *context) Stop() {
@@ -101,16 +85,21 @@ func (c *context) Stop() {
 }
 
 func (c *context) AwaitLastOffset() {
-	log.Printf("waiting for offset %v", c.realtimeOffset-1)
-	c.locklessModel.offsetChanged.L.Lock()
-	for c.locklessModel.offset < c.realtimeOffset-1 {
-		c.locklessModel.offsetChanged.Wait()
+	log.Printf("waiting for offset %v", c.batchOffset)
+	c.offsetChanged.L.Lock()
+	for c.offset < c.batchOffset {
+		c.offsetChanged.Wait()
 	}
-	c.locklessModel.offsetChanged.L.Unlock()
-	log.Printf("watermark %v for topic %v reached", c.realtimeOffset-1, Topic)
+	c.offsetChanged.L.Unlock()
+	log.Printf("watermark %v for topic %v reached", c.batchOffset, Topic)
+
+	m, cl := c.read()
+	defer cl()
+	log.Printf("products count: %v", len(m.products))
+
 }
 
-func (m *locklessModel) Start() {
+func (c *context) updateLoop() {
 
 	var offset int64
 	var start time.Time
@@ -118,13 +107,13 @@ func (m *locklessModel) Start() {
 	for {
 		writeDelay := 0 * time.Second
 
-		model := m.modelA
-		readers := &m.readersA
-		waiter := m.readerAChanged
-		if m.aIsReading {
-			model = m.modelB
-			readers = &m.readersB
-			waiter = m.readerBChanged
+		model := c.modelA
+		readers := &c.readersA
+		waiter := c.readerAChanged
+		if c.aIsReading {
+			model = c.modelB
+			readers = &c.readersB
+			waiter = c.readerBChanged
 		}
 
 		waiter.L.Lock()
@@ -133,49 +122,60 @@ func (m *locklessModel) Start() {
 		}
 		waiter.L.Unlock()
 
-		for len(m.writesRedo) > 0 {
-			w, ok := <-m.writesRedo
+		for len(c.writesRedo) > 0 {
+			msg, ok := <-c.writesRedo
 			if ok {
-				w(model)
+				applyChange(msg, model, c)
 			}
 		}
 
-		w, ok := <-m.writes
+		msg, ok := <-c.writes
 		if !ok {
 			return
 		}
-		m.writesRedo <- w
+		c.writesRedo <- msg
 		start = time.Now()
-		offset = w(model)
+		applyChange(msg, model, c)
+		offset = msg.Offset
 		writeDelay += time.Since(start)
 
-		for (writeDelay < 10*time.Millisecond) && len(m.writes) > 0 && len(m.writesRedo) < 32768 {
-			w, ok := <-m.writes
+		for writeDelay < 10*time.Millisecond && len(c.writes) > 0 && len(c.writesRedo) < 32768 {
+			msg, ok := <-c.writes
 			if !ok {
 				return
 			}
-			m.writesRedo <- w
+			c.writesRedo <- msg
 			start := time.Now()
-			offset = w(model)
+			applyChange(msg, model, c)
+			offset = msg.Offset
 			writeDelay += time.Since(start)
 		}
 
 		start = time.Now()
-		if msg.Offset < c.realtimeOffset {
-			modelBatchFinalizer(model)
-		} else {
-			modelUpdateFinalizer(model)
+		if msg.Offset >= c.batchOffset {
+			modelRealtimeFinalizer(model)
 		}
 		finalizeDelay := time.Since(start)
 		if finalizeDelay > 200*time.Millisecond {
 			log.Printf("finalize took %v to execute", finalizeDelay)
 		}
 
-		m.aIsReading = !m.aIsReading
-		m.offset = offset
-		m.offsetChanged.Broadcast()
+		c.aIsReading = !c.aIsReading
+		c.offset = offset
+		c.offsetChanged.Broadcast()
 	}
 
+}
+
+func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
+	if msg.Offset < c.batchOffset {
+		modelBatchUpdater(msg, m)
+	} else if msg.Offset == c.batchOffset {
+		modelBatchUpdater(msg, m)
+		modelBatchFinalizer(m)
+	} else {
+		modelRealtimeUpdater(msg, m)
+	}
 }
 
 // Start listens for events from kafka
@@ -183,7 +183,7 @@ func (c *context) Start() {
 
 	log.Printf("starting context %v", Topic)
 
-	go c.locklessModel.Start()
+	go c.updateLoop()
 
 	for {
 		select {
@@ -191,23 +191,11 @@ func (c *context) Start() {
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-c.partition.Messages():
-			log.Printf("processing %v:%v:%v", Topic, msg.Partition, msg.Offset)
-			if msg.Offset < c.realtimeOffset {
-				err := c.batchUpdates(msg, c.locklessModel)
-				if err != nil {
-					log.Panicf("processing kafka message failed: %s", err)
-					c.Stop()
-				}
-			} else {
-				err := c.realtimeUpdates(msg, c.locklessModel)
-				if err != nil {
-					log.Panicf("processing kafka message failed: %s", err)
-					c.Stop()
-				}
-			}
+			//			log.Printf("processing %v:%v:%v", Topic, msg.Partition, msg.Offset)
+			c.writes <- msg
 
 		case <-c.doneCh:
-			c.locklessModel.Stop()
+			close(c.writes)
 			log.Print("interrupt is detected")
 			if err := c.partition.Close(); err != nil {
 				log.Panicf("failed to close kafka partition: %s", err)
@@ -223,7 +211,7 @@ func (c *context) Start() {
 	}
 }
 
-func (c *locklessModel) read() (*model, func()) {
+func (c *context) read() (*model, func()) {
 	//	log.Printf("A: %v, B: %v, Offset: %v", atomic.LoadInt32(&c.readersA), atomic.LoadInt32(&c.readersB), c.offset)
 
 	atomic.AddInt32(&c.readersA, 1)
@@ -244,4 +232,5 @@ func (c *locklessModel) read() (*model, func()) {
 		atomic.AddInt32(&c.readersB, -1)
 		c.readerBChanged.Signal()
 	}
+
 }

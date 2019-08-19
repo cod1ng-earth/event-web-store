@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package checkout;
+
+// import public "catalog.proto";
+
+message CheckoutContext {
+    oneof checkoutContextMsg {
+        ChangeProductQuantity changeProductQuantity = 1;
+        Stock stock = 2;
+        Product product = 3;
+        OrderCart cartOrder = 4;
+    }
+}
+
+message Product {
+    string productID = 1;
+    int64 price = 2;
+    string title = 3;
+    string smallImageURL = 4;
+//    int64 tax = 5;
+}
+
+message Cart {
+    string id = 1;
+    repeated Position positions = 2;
+}
+
+message Position {
+    string productID = 1;
+    int64 price = 2;
+    string title = 3;
+    string smallImageURL = 4;
+//    int64 tax = 5;
+
+    int64 quantity = 6;
+    bool inStock = 7;
+    bool moreInStock = 8;
+}
+
+message ChangeProductQuantity {
+    string cartID = 3;
+    string productID = 1;
+    int64 quantity = 2;
+}
+
+message OrderCart {
+    string cartID = 1;
+//    string hash = 2; TODO
+}
+
+message OrderCartResonse {
+    bool successful = 1;
+}
+
+message Stock {
+    string productID = 1;
+    int64 quantity = 2;
+}

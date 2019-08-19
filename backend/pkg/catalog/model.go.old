@@ -1,16 +1,15 @@
-package products
+package catalog
 
 import (
 	"log"
 	"sort"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 )
 
 type model struct {
-	products map[string]*pb.Product
+	products map[string]*Product
 
 	sortedByUUID  productsByUUID
 	sortedByPrice productsByPrice
@@ -19,23 +18,23 @@ type model struct {
 
 func newModel() *model {
 	return &model{
-		products: make(map[string]*pb.Product),
+		products: make(map[string]*Product),
 	}
 }
 
-type productsByUUID []*pb.Product
+type productsByUUID []*Product
 
 func (pp productsByUUID) Len() int           { return len(pp) }
 func (pp productsByUUID) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
 func (pp productsByUUID) Less(i, j int) bool { return pp[i].Uuid < pp[j].Uuid }
 
-type productsByPrice []*pb.Product
+type productsByPrice []*Product
 
 func (pp productsByPrice) Len() int           { return len(pp) }
 func (pp productsByPrice) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
 func (pp productsByPrice) Less(i, j int) bool { return pp[i].Price < pp[j].Price }
 
-type productsByTitle []*pb.Product
+type productsByTitle []*Product
 
 func (pp productsByTitle) Len() int           { return len(pp) }
 func (pp productsByTitle) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
@@ -43,7 +42,18 @@ func (pp productsByTitle) Less(i, j int) bool { return pp[i].Title < pp[j].Title
 
 func modelRealtimeUpdater(msg *sarama.ConsumerMessage, m *model) {
 
-	p := pb.ProductUpdate{}
+/*
+
+	new := Product{}
+	err := proto.Unmarshal(msg.Value, &p)
+	if err != nil {
+		log.Panicf("failed to unmarshal kafka product massage %d: %v", msg.Offset, err)
+	}
+
+	old, ok := m.products[new.Uuid]
+	*/
+
+	p := ProductUpdate{}
 	err := proto.Unmarshal(msg.Value, &p)
 	if err != nil {
 		log.Panicf("failed to unmarshal kafka product massage %d: %v", msg.Offset, err)
@@ -103,12 +113,12 @@ func modelRealtimeUpdater(msg *sarama.ConsumerMessage, m *model) {
 	}
 }
 
-func remove(slice []*pb.Product, i int) []*pb.Product {
+func remove(slice []*Product, i int) []*Product {
 	return append(slice[:i], slice[i+1:]...)
 }
 
-func insert(slice []*pb.Product, i int, p *pb.Product) []*pb.Product {
-	return append(slice[:i], append([]*pb.Product{p}, slice[i:]...)...)
+func insert(slice []*Product, i int, p *Product) []*Product {
+	return append(slice[:i], append([]*Product{p}, slice[i:]...)...)
 }
 
 func modelRealtimeFinalizer(m *model) {
@@ -116,11 +126,13 @@ func modelRealtimeFinalizer(m *model) {
 
 func modelBatchUpdater(msg *sarama.ConsumerMessage, m *model) {
 
-	p := pb.ProductUpdate{}
+	p := Product{}
 	err := proto.Unmarshal(msg.Value, &p)
 	if err != nil {
 		log.Panicf("failed to unmarshal kafka product massage %d: %v", msg.Offset, err)
 	}
+
+	if 
 
 	if p.New == nil {
 		delete(m.products, p.Old.Uuid)

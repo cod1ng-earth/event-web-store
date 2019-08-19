@@ -49,7 +49,7 @@ func newRow() []string {
 		log.Panicf("failed to transform bytes to uuid: %v", err)
 	}
 
-	price := float64(rand.Intn(10000)) / 100
+	price := rand.Intn(10000)
 	return []string{
 		UUID.String(),
 		fmt.Sprintf("%s %s %s", lorem.Word(4, 13), lorem.Word(4, 13), lorem.Word(4, 13)),
@@ -58,6 +58,6 @@ func newRow() []string {
 		fmt.Sprintf("%s/%s", lorem.Word(4, 13), lorem.Word(4, 13)),
 		lorem.Url(),
 		lorem.Url(),
-		fmt.Sprintf("%.2f", price),
+		fmt.Sprintf("%d", price),
 	}
 }

@@ -1,13 +1,11 @@
 package checkout
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 )
@@ -48,10 +46,9 @@ func OrderHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, isOrdered := orders[cartID]
 
-	status := map[string]string{}
+	status := &OrderCartResonse{}
+	status.Successful = isOrdered
 	if isOrdered {
-		status["status"] = "success"
-
 		expiration := time.Now().Add(365 * 24 * time.Hour)
 		cookie = &http.Cookie{
 			Name:    "cart",
@@ -59,12 +56,9 @@ func OrderHandler(w http.ResponseWriter, r *http.Request) {
 			Expires: expiration,
 		}
 		http.SetCookie(w, cookie)
-
-	} else {
-		status["status"] = "failure"
 	}
 
-	bytes, err := json.Marshal(status)
+	bytes, err := proto.Marshal(status)
 	if err != nil {
 		log.Printf("failed to serialize order status: %v", err)
 	}
@@ -77,9 +71,9 @@ func OrderHandler(w http.ResponseWriter, r *http.Request) {
 
 func orderCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 
-	change := &pb.CheckoutContext{
-		CheckoutContextMsg: &pb.CheckoutContext_CartOrder{
-			CartOrder: &pb.CartOrder{
+	change := &CheckoutContext{
+		CheckoutContextMsg: &CheckoutContext_CartOrder{
+			CartOrder: &OrderCart{
 				CartID: cartID,
 			},
 		},
@@ -110,7 +104,7 @@ func orderCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 	return nil
 }
 
-func ordersProcessor(p *pb.CartOrder, msgOffset int64) {
+func ordersProcessor(p *OrderCart, msgOffset int64) {
 	mut.Lock()
 	defer mut.Unlock()
 

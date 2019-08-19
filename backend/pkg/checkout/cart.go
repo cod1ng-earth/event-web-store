@@ -1,31 +1,35 @@
 package checkout
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sort"
 	"time"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 )
 
-type cart []cartItem
+//type cart []cartItem
+//
+//type cartItem struct {
+//	Product     *Product `json:"product"`
+//	Quantity    int64    `json:"quantity"`
+//	MoreInStock bool     `json:"moreInStock"`
+//	InStock     bool     `json:"inStock"`
+//}
+//
+//func (a cart) Len() int           { return len(a) }
+//func (a cart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+//func (a cart) Less(i, j int) bool { return a[i].Product.Title < a[j].Product.Title }
 
-type cartItem struct {
-	Product     *pb.Product `json:"product"`
-	Quantity    int64       `json:"quantity"`
-	MoreInStock bool        `json:"moreInStock"`
-	InStock     bool        `json:"inStock"`
-}
+type positions []*Position
 
-func (a cart) Len() int           { return len(a) }
-func (a cart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a cart) Less(i, j int) bool { return a[i].Product.Title < a[j].Product.Title }
+func (a positions) Len() int           { return len(a) }
+func (a positions) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a positions) Less(i, j int) bool { return a[i].Title < a[j].Title }
 
 func CartHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
@@ -62,20 +66,28 @@ func CartHandler(w http.ResponseWriter, r *http.Request) {
 	mut.RLock()
 	defer mut.RUnlock()
 
-	cart := cart{}
+	pp := positions{}
 	for uuid, count := range carts[cartID] {
 		if _, ok := products[uuid]; ok {
-			cart = append(cart, cartItem{
-				Product:     products[uuid],
+			pp = append(pp, &Position{
+				ProductID:     uuid,
+				Price:         products[uuid].Price,
+				Title:         products[uuid].Title,
+				SmallImageURL: products[uuid].SmallImageURL,
+
 				Quantity:    count,
 				MoreInStock: stock[uuid] > count,
 				InStock:     stock[uuid] >= count,
 			})
 		}
 	}
-	sort.Sort(cart)
+	sort.Sort(pp)
 
-	bytes, err := json.Marshal(cart)
+	cart := &Cart{
+		Positions: pp,
+	}
+
+	bytes, err := proto.Marshal(cart)
 	if err != nil {
 		log.Printf("failed to serialize cart: %v", err)
 	}
@@ -87,29 +99,34 @@ func CartHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
-	decoder := json.NewDecoder(r.Body)
-	var cc pb.CartChange
-	err := decoder.Decode(&cc)
-	if err != nil && err != io.EOF {
+	bytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return fmt.Errorf("failed to read from http body: %v", err)
+	}
+
+	var cc ChangeProductQuantity
+	err = proto.Unmarshal(bytes, &cc)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("failed to decode cart change: %v", err)
 	}
 
 	cc.CartID = cartID
 
-	change := &pb.CheckoutContext{
-		CheckoutContextMsg: &pb.CheckoutContext_CartChange{
-			CartChange: &cc,
+	change := &CheckoutContext{
+		CheckoutContextMsg: &CheckoutContext_ChangeProductQuantity{
+			ChangeProductQuantity: &cc,
 		},
 	}
-	bytes, err := proto.Marshal(change)
+	bytes, err = proto.Marshal(change)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("failed to serialize cart change massage: %v", err)
 	}
 
 	msg := &sarama.ProducerMessage{
-		Topic: "checkout",
+		Topic: Topic,
 		Key:   sarama.StringEncoder(cartID),
 		Value: sarama.ByteEncoder(bytes),
 	}
@@ -128,7 +145,7 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 	return nil
 }
 
-func cartProcessor(cc *pb.CartChange, msgOffset int64) error {
+func cartProcessor(cc *ChangeProductQuantity, msgOffset int64) error {
 
 	offset = msgOffset
 	defer offsetChanged.Broadcast()
@@ -142,16 +159,10 @@ func cartProcessor(cc *pb.CartChange, msgOffset int64) error {
 		carts[cartID] = make(map[string]int64)
 	}
 
-	switch cc.Action {
-	case pb.CartChangeAction_add:
-		carts[cartID][cc.Uuid] += 1
+	carts[cartID][cc.ProductID] = cc.Quantity
 
-	case pb.CartChangeAction_remove:
-		carts[cartID][cc.Uuid] -= 1
-	}
-
-	if carts[cartID][cc.Uuid] == 0 {
-		delete(carts[cartID], cc.Uuid)
+	if carts[cartID][cc.ProductID] == 0 {
+		delete(carts[cartID], cc.ProductID)
 	}
 
 	return nil

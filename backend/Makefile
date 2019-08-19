@@ -56,9 +56,6 @@ tmp/products-2.csv: tmp/products-1.csv cmd/csv-fake-alternate/main.go
 lint: ##@develop Run the go linter
 	golangci-lint run -e ./vendor ./...
 
-pkg/pb/products.pb.go: pkg/pb/products.proto
-	protoc --go_out=. pkg/pb/products.proto
-
 curl: ##@benchmark show json
 	curl -v --silent ${URL} | jq .
 

@@ -4,14 +4,15 @@ import (
 	"log"
 	"net/http"
 
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/catalog"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/products"
 	"github.com/Shopify/sarama"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
-	brokerList = kingpin.Flag("brokerList", "List of brokers to connect").Default("kafka:9092").OverrideDefaultFromEnvar("BROKER_LIST").Strings()
+	brokerList  = kingpin.Flag("brokerList", "List of brokers to connect").Default("localhost:9092").Strings()
+	contextList = kingpin.Flag("contexts", "List of contexts to run").Default("all").Strings()
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 	config.Producer.Flush.MaxMessages = 500
 	config.Producer.Return.Successes = true
 
-	prd := products.NewContext(brokerList, config)
+	prd := catalog.NewContext(brokerList, config)
 	go prd.Start()
 	defer prd.Stop()
 	prd.AwaitLastOffset()

@@ -1,7 +1,6 @@
-package products
+package catalog
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 
@@ -27,26 +26,26 @@ func (c *context) NewPDPHandler() http.HandlerFunc {
 			return
 		}
 
-		respondJson(w, p)
+		respondProtoBuf(w, p)
 	}
 }
 
-func respondJson(w http.ResponseWriter, response interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-
-	bytes, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("failed to serialize: %v", err)
-	}
-
-	_, err = w.Write(bytes)
-	if err != nil {
-		log.Printf("failed to send result: %v", err)
-	}
-}
+//func respondJson(w http.ResponseWriter, response interface{}) {
+//	w.Header().Set("Content-Type", "application/json")
+//
+//	bytes, err := json.Marshal(response)
+//	if err != nil {
+//		log.Printf("failed to serialize: %v", err)
+//	}
+//
+//	_, err = w.Write(bytes)
+//	if err != nil {
+//		log.Printf("failed to send result: %v", err)
+//	}
+//}
 
 func respondProtoBuf(w http.ResponseWriter, response proto.Message) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/protobuf")
 
 	bytes, err := proto.Marshal(response)
 	if err != nil {

@@ -20,11 +20,13 @@ make start
 ```
 
 ## Required tools for development
-- docker
 - golang
 - air https://github.com/cosmtrek/air
 - elm
 - elm-live
+- protoc
+- protoc-gen-elm https://www.npmjs.com/package/protoc-gen-elm
+- docker
 
 
 ## Features
@@ -42,8 +44,13 @@ make start
 
 ## Roadmap
 
+sync frontend
+- websocket
+- localstorage
+- tab open
 
 backend
+- remove .uuid
 - after dirty shutdown wait for ip ttl
 - use context specific data structs
 - snapshots
@@ -57,10 +64,13 @@ backend
 - add timeouts & retries & exponential backoff & shedding & circuitbreaking & avoid thundering heard
 - ensure ordered cart is exactly the cart shown in the browser
 - when triggering an sideeffect, then ensure to do this only once
+- sync to other contexts before processing commands
 
 frontend
+- remove .uuid
+- use int32 everywhere https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/latest/#known-limitations
 - use less & cleanup elm
-- use protobuf
+- use protobuf / remove json
 - use modules
 - use urls & links
 - only process results matching the current model

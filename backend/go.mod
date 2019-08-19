@@ -7,6 +7,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4 // indirect
 	github.com/bsm/sarama-cluster v2.1.15+incompatible
+	github.com/damoon/eventstore-example v0.0.0-20180810122752-bdcbc7f83bce
 	github.com/drhodes/golorem v0.0.0-20160418191928-ecccc744c2d9
 	github.com/golang/protobuf v1.3.2
 	github.com/hashicorp/golang-lru v0.5.3

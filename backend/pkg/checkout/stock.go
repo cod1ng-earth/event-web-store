@@ -1,14 +1,10 @@
 package checkout
 
-import (
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
-)
-
-func stockProcessor(s *pb.Stock) error {
+func stockProcessor(s *Stock) error {
 	mut.Lock()
 	defer mut.Unlock()
 
-	stock[s.Uuid] += s.Quantity
+	stock[s.ProductID] += s.Quantity
 
 	return nil
 }

@@ -5,7 +5,6 @@ import (
 	"log"
 	"sync"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
@@ -22,7 +21,7 @@ var (
 
 	producer sarama.SyncProducer
 
-	products map[string]*pb.Product
+	products map[string]*Product
 	stock    map[string]int64
 	carts    map[string]map[string]int64
 	orders   map[string]map[string]int64
@@ -31,7 +30,7 @@ var (
 func init() {
 	offsetChanged = sync.NewCond(&sync.Mutex{})
 
-	products = map[string]*pb.Product{}
+	products = map[string]*Product{}
 	stock = map[string]int64{}
 	carts = make(map[string]map[string]int64)
 	orders = make(map[string]map[string]int64)
@@ -65,7 +64,7 @@ func StartContext(brokers *[]string, cfg *sarama.Config) func() {
 }
 
 func checkoutProcessor(msg *sarama.ConsumerMessage) error {
-	cc := pb.CheckoutContext{}
+	cc := CheckoutContext{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka cart massage %d: %v", msg.Offset, err)
@@ -75,22 +74,22 @@ func checkoutProcessor(msg *sarama.ConsumerMessage) error {
 
 	switch x := cc.GetCheckoutContextMsg().(type) {
 
-	case *pb.CheckoutContext_CartChange:
-		if err := cartProcessor(cc.GetCartChange(), offset); err != nil {
+	case *CheckoutContext_ChangeProductQuantity:
+		if err := cartProcessor(cc.GetChangeProductQuantity(), offset); err != nil {
 			return err
 		}
 
-	case *pb.CheckoutContext_Stock:
+	case *CheckoutContext_Stock:
 		if err := stockProcessor(cc.GetStock()); err != nil {
 			return err
 		}
 
-	case *pb.CheckoutContext_ProductUpdate:
-		if err := productsProcessor(cc.GetProductUpdate()); err != nil {
+	case *CheckoutContext_Product:
+		if err := productsProcessor(cc.GetProduct()); err != nil {
 			return err
 		}
 
-	case *pb.CheckoutContext_CartOrder:
+	case *CheckoutContext_CartOrder:
 		ordersProcessor(cc.GetCartOrder(), offset)
 
 	case nil:

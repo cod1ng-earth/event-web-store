@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package catalog;
+
+message CatalogPage {
+    repeated Product products = 1;
+    int64 totalItems = 2;
+    int64 totalPages = 3;
+    int64 currentPage = 4;
+    int64 setPageTo = 5;
+    string sorting = 6;
+    string filtering = 7;
+    int64 itemsPerPage = 8;
+}
+
+message Product {
+    string id = 1;
+    int64 price = 2;
+    string title = 3;
+    string description = 4;
+    string longtext = 5;
+    string category = 6;
+    string smallImageURL = 7;
+    string largeImageURL = 8;
+    bool disabled = 9;
+}

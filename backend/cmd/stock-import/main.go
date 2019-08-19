@@ -8,10 +8,11 @@ import (
 	"os"
 	"strconv"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 	"gopkg.in/alecthomas/kingpin.v2"
+
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
 )
 
 var (
@@ -67,9 +68,9 @@ func importStock(stocks map[string][]string, ch chan<- *sarama.ProducerMessage) 
 	}
 }
 
-func sendUpdate(ch chan<- *sarama.ProducerMessage, msg *pb.Stock) error {
-	change := &pb.CheckoutContext{
-		CheckoutContextMsg: &pb.CheckoutContext_Stock{
+func sendUpdate(ch chan<- *sarama.ProducerMessage, msg *checkout.Stock) error {
+	change := &checkout.CheckoutContext{
+		CheckoutContextMsg: &checkout.CheckoutContext_Stock{
 			Stock: msg,
 		},
 	}
@@ -79,7 +80,7 @@ func sendUpdate(ch chan<- *sarama.ProducerMessage, msg *pb.Stock) error {
 	}
 	ch <- &sarama.ProducerMessage{
 		Topic: "checkout",
-		Key:   sarama.StringEncoder(msg.Uuid),
+		Key:   sarama.StringEncoder(msg.ProductID),
 		Value: sarama.ByteEncoder(bytes),
 	}
 	return nil
@@ -106,7 +107,7 @@ func rows(path string) (map[string][]string, error) {
 	return m, nil
 }
 
-func row2stock(row []string) (*pb.Stock, error) {
+func row2stock(row []string) (*checkout.Stock, error) {
 
 	if row == nil {
 		return nil, nil
@@ -114,10 +115,10 @@ func row2stock(row []string) (*pb.Stock, error) {
 
 	quantity, err := strconv.ParseInt(row[1], 10, 64)
 	if err != nil {
-		return &pb.Stock{}, fmt.Errorf("stock quantity can not be parsed '%v': %v", row, err)
+		return &checkout.Stock{}, fmt.Errorf("stock quantity can not be parsed '%v': %v", row, err)
 	}
-	return &pb.Stock{
-		Uuid:     row[0],
-		Quantity: quantity,
+	return &checkout.Stock{
+		ProductID: row[0],
+		Quantity:  quantity,
 	}, nil
 }

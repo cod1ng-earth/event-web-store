@@ -8,7 +8,9 @@ import (
 	"os"
 	"strconv"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/catalog"
+	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
+
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -99,20 +101,12 @@ func upsert(prevProducts, currentProducts map[string][]string, ch chan<- *sarama
 			log.Printf(ll, UUID)
 		}
 
-		prev, err := row2product(prevRow)
-		if err != nil {
-			log.Panicf("failed to serialize previous product %s: %s", UUID, err)
-		}
 		curr, err := row2product(currentRow)
 		if err != nil {
 			log.Panicf("failed to serialize previous product %s: %s", UUID, err)
 		}
-		msg := &pb.ProductUpdate{
-			Old: prev,
-			New: curr,
-		}
 
-		err = sendUpdate(ch, UUID, msg)
+		err = sendUpdate(ch, UUID, curr)
 		if err != nil {
 			log.Panicf("failed to send update massage: %s", err)
 		}
@@ -132,21 +126,25 @@ func remove(prevProducts map[string][]string, ch chan<- *sarama.ProducerMessage)
 		if err != nil {
 			log.Panicf("failed to serialize previous product %s: %s", UUID, err)
 		}
-		msg := &pb.ProductUpdate{
-			Old: prev,
-		}
+		prev.Disabled = true
 
-		err = sendUpdate(ch, UUID, msg)
+		err = sendUpdate(ch, UUID, prev)
 		if err != nil {
 			log.Panicf("failed to send update massage: %s", err)
 		}
 	}
 }
 
-func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *pb.ProductUpdate) error {
-	change := &pb.CheckoutContext{
-		CheckoutContextMsg: &pb.CheckoutContext_ProductUpdate{
-			ProductUpdate: msg,
+func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *catalog.Product) error {
+
+	change := &checkout.CheckoutContext{
+		CheckoutContextMsg: &checkout.CheckoutContext_Product{
+			Product: &checkout.Product{
+				Price:         msg.Price,
+				ProductID:     msg.Id,
+				SmallImageURL: msg.SmallImageURL,
+				Title:         msg.Title,
+			},
 		},
 	}
 	bytes, err := proto.Marshal(change)
@@ -154,7 +152,7 @@ func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *pb.ProductU
 		return fmt.Errorf("failed to serialize product massage for checkout topic: %s", err)
 	}
 	ch <- &sarama.ProducerMessage{
-		Topic: "checkout",
+		Topic: checkout.Topic,
 		Key:   sarama.StringEncoder(UUID),
 		Value: sarama.ByteEncoder(bytes),
 	}
@@ -164,7 +162,7 @@ func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *pb.ProductU
 		return fmt.Errorf("failed to serialize product massage: %s", err)
 	}
 	ch <- &sarama.ProducerMessage{
-		Topic: "products",
+		Topic: catalog.Topic,
 		Key:   sarama.StringEncoder(UUID),
 		Value: sarama.ByteEncoder(bytes),
 	}
@@ -217,24 +215,24 @@ func rows(path string) (map[string][]string, error) {
 	return m, nil
 }
 
-func row2product(row []string) (*pb.Product, error) {
+func row2product(row []string) (*catalog.Product, error) {
 
 	if row == nil {
 		return nil, nil
 	}
 
-	price, err := strconv.ParseFloat(row[7], 32)
+	price, err := strconv.ParseInt(row[7], 10, 64)
 	if err != nil {
-		return &pb.Product{}, err
+		return &catalog.Product{}, err
 	}
-	return &pb.Product{
-		Uuid:          row[0],
+	return &catalog.Product{
+		Id:            row[0],
 		Title:         row[1],
 		Description:   row[2],
 		Longtext:      row[3],
 		Category:      row[4],
 		SmallImageURL: row[5],
 		LargeImageURL: row[6],
-		Price:         float32(price),
+		Price:         price,
 	}, nil
 }
