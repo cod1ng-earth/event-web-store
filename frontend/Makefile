@@ -32,7 +32,7 @@ start: ##@develop start the frontend on port 8000
 	elm-live src/Main.elm --dir=./dist --pushstate -- --output=./dist/main.js
 
 open: ##@develop start and open the frontend
-	elm-live src/Main.elm --dir=./dist --pushstate -- --output=./dist/main.js --open
+	elm-live src/Main.elm --dir=./dist --pushstate --open -- --output=./dist/main.js
 
 # https://github.com/rtfeldman/elm-spa-example
 # $ elm make src/Main.elm --output elm.js --optimize

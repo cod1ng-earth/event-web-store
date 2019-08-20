@@ -3,7 +3,7 @@ FROM golang:1.12.7-alpine3.10
 # The rest of the container's file-system can be read-only
 # e.g via Docker Compose's 'read_only: true'
 # or Kubernetes' pod security policy 'ReadOnlyRootFilesystem'
-VOLUME ["/go/src/app/tmp", "/tmp", "/root/.cache/go-build"]
+VOLUME ["/go/src/app/tmp", "/tmp", "/root/.cache/go-build", "/go/pkg"]
 RUN set -euxo pipefail; \
     apk add --no-cache \
     bash=~5.0 \

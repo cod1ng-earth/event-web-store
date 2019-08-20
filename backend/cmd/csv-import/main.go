@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	brokerList   = kingpin.Flag("brokerList", "List of brokers to connect").Default("localhost:9092").OverrideDefaultFromEnvar("BROKER_LIST").Strings()
+	brokerList   = kingpin.Flag("brokerList", "List of brokers to connect").Default("kafka:9092").OverrideDefaultFromEnvar("BROKER_LIST").Strings()
 	verbose      = kingpin.Flag("verbose", "Verbosity").Default("false").Bool()
 	currentPath  = kingpin.Arg("current", "path to current import file").Required().String()
 	previousPath = kingpin.Arg("previous", "path to previous import file").Default("/dev/null").String()

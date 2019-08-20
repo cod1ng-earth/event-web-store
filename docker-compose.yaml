@@ -1,13 +1,14 @@
 version: '3.7'
 
 services:
+
   zookeeper:
     cap_drop: [ALL]
     networks:
+      - default
       - sandbox
     read_only: true
     security_opt: ['no-new-privileges:true']
-    user: '65535'
     build:
       args:
         - ZOOKEEPER_IMAGE=bitnami/zookeeper:3.5.5-r62
@@ -17,13 +18,14 @@ services:
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     user: '65535'
+
   kafka:
     cap_drop: [ALL]
     networks:
+      - default
       - sandbox
     read_only: true
     security_opt: ['no-new-privileges']
-    user: '65535'
     build:
       args:
         - KAFKA_IMAGE=bitnami/kafka:2.3.0-r35
@@ -35,18 +37,18 @@ services:
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
 #      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
       - ALLOW_PLAINTEXT_LISTENER=yes
-    depends_on:
-      - zookeeper
+    ports:
+      - '9092:9092'
     user: '65535'
+
   backend:
     cap_drop: [ALL]
     networks:
+      - default
       - sandbox
     build:
       context: backend
       dockerfile: ../docker/backend/Dockerfile
-    depends_on:
-      - kafka
     environment: 
       - BROKER_LIST=kafka:9092
     ports:
@@ -59,10 +61,13 @@ services:
       - ./backend/air.conf:/go/src/app/air.conf:ro,cached
       - ./backend/go.mod:/go/src/app/go.mod:ro,cached
       - ./backend/go.sum:/go/src/app/go.sum:ro,cached
+      - ./backend/Makefile:/go/src/app/Makefile:ro,cached
     #user: '65535'
+
   frontend:
     cap_drop: [ALL]
     networks:
+      - default
       - sandbox
     build:
       context: frontend
@@ -74,6 +79,7 @@ services:
       - ./frontend/dist:/app/dist:rw,cached
       - ./frontend/src:/app/src:ro,cached
       - ./frontend/elm.json:/app/elm.json:ro,cached
+      - ./frontend/Makefile:/app/Makefile:ro,cached
     #user: '65535'
 
 volumes:
@@ -84,6 +90,6 @@ volumes:
 
 networks:
   default:
-    internal: true
+    internal: false
   sandbox:
     internal: true
