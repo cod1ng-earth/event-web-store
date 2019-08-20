@@ -1,0 +1,25 @@
+version: '3.7'
+
+services:
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - '8000:8000'
+    networks:
+      - shared_event-store
+#    depends_on:
+#      - backend
+    read_only: true
+    volumes:
+      - ./:/app/:rw,cached
+    user: '${UID}:${GID}'
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    restart: unless-stopped
+
+networks:
+  shared_event-store:
+    external: true

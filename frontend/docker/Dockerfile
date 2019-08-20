@@ -13,4 +13,4 @@ RUN set -euxo pipefail; \
     yarn global add elm elm-live
 WORKDIR /app
 #USER 65635
-CMD [ "make", "start" ]
+CMD [ "make", "run" ]

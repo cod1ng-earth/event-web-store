@@ -1,0 +1,26 @@
+version: '3.7'
+
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment: 
+      - BROKER_LIST=kafka:9092
+    ports:
+      - '8080:8080'
+#    depends_on:
+#      - kafka
+    networks:
+      - shared_event-store
+    read_only: true
+    volumes:
+      - ./:/go/src/app/:rw,cached
+    user: '${UID}:${GID}'
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+networks:
+  shared_event-store:
+    external: true
