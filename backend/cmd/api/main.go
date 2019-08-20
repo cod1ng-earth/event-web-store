@@ -6,7 +6,9 @@ import (
 
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/catalog"
 	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
+
 	"github.com/Shopify/sarama"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -38,6 +40,8 @@ func main() {
 	defer shutdown()
 	http.HandleFunc("/cart", checkout.CartHandler)
 	http.HandleFunc("/orderCart", checkout.OrderHandler)
+
+	http.Handle("/metrics", promhttp.Handler())
 
 	log.Println("listening on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

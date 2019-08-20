@@ -96,7 +96,6 @@ func (c *context) AwaitLastOffset() {
 	m, cl := c.read()
 	defer cl()
 	log.Printf("products count: %v", len(m.products))
-
 }
 
 func (c *context) updateLoop() {
