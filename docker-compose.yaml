@@ -31,23 +31,24 @@ services:
     volumes:
       - 'kafka_data:/bitnami'
     environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTAINER://kafka:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTAINER://kafka:9093
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTAINER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+#      - KAFKA_CFG_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+#      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       - zookeeper
     user: '65535'
   backend:
     cap_drop: [ALL]
+    networks:
+      - sandbox
     build:
       context: backend
       dockerfile: ../docker/backend/Dockerfile
     depends_on:
       - kafka
     environment: 
-      - BROKER_LIST=kafka:9093
+      - BROKER_LIST=kafka:9092
     ports:
       - '8080:8080'
     read_only: true
@@ -61,6 +62,8 @@ services:
     #user: '65535'
   frontend:
     cap_drop: [ALL]
+    networks:
+      - sandbox
     build:
       context: frontend
       dockerfile: ../docker/frontend/Dockerfile

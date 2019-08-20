@@ -36,22 +36,22 @@ start: ##@develop Start the backend
 	air -c air.conf
 
 import: products-1.csv ##@import Import products
-	go run ./cmd/csv-import/main.go ./tmp/products-1.csv
+	go run ./cmd/csv-import/main.go /tmp/products-1.csv
 
 update: products-1.csv products-2.csv  ##@import Update products
-	go run ./cmd/csv-import/main.go ./tmp/products-2.csv ./tmp/products-1.csv
+	go run ./cmd/csv-import/main.go /tmp/products-2.csv /tmp/products-1.csv
 
 stock: products-1-stock.csv ##@import Import stock
-	go run ./cmd/stock-import/main.go ./tmp/products-1-stock.csv
+	go run ./cmd/stock-import/main.go /tmp/products-1-stock.csv
 
 products-1.csv: cmd/csv-fake-create/main.go
-	go run ./cmd/csv-fake-create/main.go -seed=0 > ./tmp/products-1.csv
+	go run ./cmd/csv-fake-create/main.go -seed=0 > /tmp/products-1.csv
 
 products-1-stock.csv: products-1.csv cmd/csv-fake-stock/main.go
-	cat ./tmp/products-1.csv | go run ./cmd/csv-fake-stock/main.go -seed=2 > ./tmp/products-1-stock.csv
+	cat ./tmp/products-1.csv | go run ./cmd/csv-fake-stock/main.go -seed=2 > /tmp/products-1-stock.csv
 
 products-2.csv: products-1.csv cmd/csv-fake-alternate/main.go
-	cat ./tmp/products-1.csv | go run ./cmd/csv-fake-alternate/main.go -seed=1 > ./tmp/products-2.csv
+	cat ./tmp/products-1.csv | go run ./cmd/csv-fake-alternate/main.go -seed=1 > /tmp/products-2.csv
 
 lint: ##@develop Run the go linter
 	golangci-lint run -e ./vendor ./...

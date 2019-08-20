@@ -15,11 +15,7 @@ RUN set -euxo pipefail; \
 RUN set -euxo pipefail; \
     wget -O /bin/air https://raw.githubusercontent.com/cosmtrek/air/master/bin/linux/air \
     && chmod +x /bin/air
+ENV GO111MODULE=on
 WORKDIR /go/src/app
-COPY go.mod go.mod
-COPY go.sum go.sum
-RUN set -euxo pipefail; \
-    GO111MODULE=on go mod download
-COPY . .
 #USER 65635
 CMD [ "make", "start" ]

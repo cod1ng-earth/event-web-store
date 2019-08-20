@@ -6,8 +6,8 @@ help: ### Display this help text.
 setup: clean ### Stop and remove all containers, networks and volumes. (Re)build all images. Import products into Kafka.
 	docker-compose build
 	docker-compose up --detach kafka
-	docker-compose run --rm backend bash -euo pipefail -c 'echo "Waiting for Kafka... "; while ! nc -z kafka 9093; do sleep 1; done; echo "Kafka is ready!"'
-	docker-compose run --rm backend bash -euo pipefail -c 'make stock'
+	docker-compose exec backend bash -euo pipefail -c 'echo "Waiting for Kafka... "; while ! nc -z kafka 9092; do sleep 1; done; echo "Kafka is ready!"'
+	docker-compose exec backend make stock
 	docker-compose down
 .PHONY: setup
 
@@ -20,7 +20,7 @@ stop: ### Stop all containers, networks, and volumes.
 .PHONY: stop
 
 clean: ### Stop and remove all containers, images, networks, and volumes.
-	docker-compose down --remove-orphans --rmi all --volumes
+	docker-compose down --remove-orphans --volumes --timeout 1
 .PHONY: clean
 
 logs: ### Display container logs.
