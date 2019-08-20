@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	brokerList  = kingpin.Flag("brokerList", "List of brokers to connect").Default("localhost:9092").Strings()
+	brokerList  = kingpin.Flag("brokerList", "List of brokers to connect").Default("kafka:9092").OverrideDefaultFromEnvar("BROKER_LIST").Strings()
 	contextList = kingpin.Flag("contexts", "List of contexts to run").Default("all").Strings()
 )
 
