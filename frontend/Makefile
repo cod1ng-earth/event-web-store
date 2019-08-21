@@ -7,6 +7,7 @@ export GID=$(shell id -g)
 start: ##@docker Start the frontend
 	touch dist/main.js
 	chmod o+w dist/main.js
+	mkdir -p elm-stuff
 	docker-compose up --detach --build
 .PHONY: start
 
@@ -38,6 +39,9 @@ open: ##@host start and open the frontend
 # $ uglifyjs elm.js --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters=true,keep_fargs=false,unsafe_comps=true,unsafe=true,passes=2' --output=elm.js && uglifyjs elm.js --mangle --output=elm.js
 
 
-elmfmt:
-	find src | grep \.elm\$$ | xargs elm-format --yes
+elmfmt: ##@qa format code and remove unused imports
 	find src | grep \.elm\$$ | xargs -L 1 elm-impfix --replace
+	find src | grep \.elm\$$ | xargs elm-format --yes
+
+analyse: ##@qa run static code analyser
+	elm-analyse . -s

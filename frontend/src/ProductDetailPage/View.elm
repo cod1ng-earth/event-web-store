@@ -1,12 +1,7 @@
 module ProductDetailPage.View exposing (..)
 
 import Html exposing (div, h1, Html, img, span, text)
-
 import Html.Attributes exposing (class, src)
-
-
-
-
 import CatalogPage.View exposing (addToCartButton, formatPrice, productImage)
 import ProductDetailPage.Model exposing (..)
 import ProductDetailPage.Update exposing (..)

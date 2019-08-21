@@ -1,6 +1,10 @@
-module CartPage.Model exposing (..)
+module CartPage.Model exposing (Model, MaybeOrderedCart(..), init)
 
+import Task
+import Time
 import Checkout
+import Message exposing (Msg)
+import CartPage.Message
 
 
 type alias Model =
@@ -14,12 +18,17 @@ type MaybeOrderedCart
     | OrderedCart
 
 
-init : Model
+init : ( Model, Cmd Msg )
 init =
-    { cart = Cart emptyCart
-    , error = Nothing
-    }
+    let
+        model =
+            { cart = Cart emptyCart
+            , error = Nothing
+            }
+    in
+        ( model, Task.perform (\_ -> Message.CartPageMsg CartPage.Message.LoadCart) Time.here )
 
 
+emptyCart : Checkout.Cart
 emptyCart =
     Checkout.Cart "" []

@@ -1,6 +1,10 @@
-module CatalogPage.Model exposing (..)
+module CatalogPage.Model exposing (Model, init)
 
+import Task
+import Time
 import Catalog
+import Message exposing (Msg)
+import CatalogPage.Message
 
 
 type alias Model =
@@ -14,13 +18,17 @@ type alias Model =
     }
 
 
-init : Model
+init : ( Model, Cmd Msg )
 init =
-    { products = Nothing
-    , currentPage = 0
-    , totalPages = 0
-    , sorting = "name"
-    , prefix = ""
-    , filtering = ""
-    , error = Nothing
-    }
+    let
+        model =
+            { products = Nothing
+            , currentPage = 0
+            , totalPages = 0
+            , sorting = "name"
+            , prefix = ""
+            , filtering = ""
+            , error = Nothing
+            }
+    in
+        ( model, Task.perform (\_ -> Message.CatalogPageMsg CatalogPage.Message.LoadProducts) Time.here )

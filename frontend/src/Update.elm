@@ -1,17 +1,12 @@
-module Update exposing (..)
-
-
-
+module Update exposing (update)
 
 import CartPage.Update
-
 import CatalogPage.Model
 import CatalogPage.Update
-import ProductDetailPage.Message exposing (..)
 import ProductDetailPage.Model
 import ProductDetailPage.Update
 import Model exposing (Content(..), Model)
-import Message exposing (..)
+import Message exposing (Msg(..))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -42,7 +37,11 @@ update msg model =
             ( { model | content = ShowCartPage }, Cmd.none )
 
         ( ShowCatalogPage, _ ) ->
-            ( { model | content = CatalogPage CatalogPage.Model.init }, CatalogPage.Update.fetchProducts CatalogPage.Model.init )
+            let
+                ( catalogModel, catalogCmd ) =
+                    CatalogPage.Model.init
+            in
+                ( { model | content = CatalogPage catalogModel }, catalogCmd )
 
         ( ShowProductDetailPage id, _ ) ->
             let

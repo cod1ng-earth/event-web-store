@@ -1,4 +1,4 @@
-module ProductDetailPage.Message exposing (..)
+module ProductDetailPage.Message exposing (SubMsg(..))
 
 import Http
 import Catalog

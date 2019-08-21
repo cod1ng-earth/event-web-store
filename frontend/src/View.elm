@@ -1,15 +1,12 @@
-module View exposing (..)
+module View exposing (view)
 
 import Html exposing (button, div, h1, header, Html, span, text)
 import Html.Attributes exposing (attribute, class, disabled, id)
 import Html.Events exposing (onClick)
-
-import Model exposing (..)
-import Message exposing (..)
-
+import Model exposing (Model, Content(..))
+import Message exposing (Msg(..))
 import CatalogPage.View
 import CartPage.View exposing (itemsInCart)
-import CartPage.Message exposing (..)
 import ProductDetailPage.View
 
 

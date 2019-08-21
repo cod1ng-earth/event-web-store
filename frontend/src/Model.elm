@@ -1,37 +1,22 @@
-module Model exposing (..)
-
+module Model exposing (Model, Content(..), init)
 
 import Browser.Events exposing (Visibility(..))
-
-
-
-
-
-
-
-
-
-
-
-
-import CatalogPage.Update as CatalogUpdate
-import CartPage.Update as CartPageUpdate
-import CatalogPage.Model as CatalogModel
-import ProductDetailPage.Model as ProductDetailPageModel
-import CartPage.Model as CartPageModel
-import Message exposing (..)
+import CatalogPage.Model
+import ProductDetailPage.Model
+import CartPage.Model
+import Message exposing (Msg)
 
 
 type alias Model =
     { error : String
     , content : Content
-    , cart : CartPageModel.Model
+    , cart : CartPage.Model.Model
     }
 
 
 type Content
-    = CatalogPage CatalogModel.Model
-    | ProductDetailPage ProductDetailPageModel.Model
+    = CatalogPage CatalogPage.Model.Model
+    | ProductDetailPage ProductDetailPage.Model.Model
     | ShowCartPage
     | OrderSuccessfulPage
     | OrderFailedPage
@@ -39,12 +24,19 @@ type Content
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { error = ""
-      , content = CatalogPage CatalogModel.init
-      , cart = CartPageModel.init
-      }
-    , Cmd.batch
-        [ CatalogUpdate.fetchProducts CatalogModel.init
-        , CartPageUpdate.fetchCart
-        ]
-    )
+    let
+        ( cartModel, cartCmd ) =
+            CartPage.Model.init
+
+        ( catalogModel, catalogCmd ) =
+            CatalogPage.Model.init
+    in
+        ( { error = ""
+          , content = CatalogPage catalogModel
+          , cart = cartModel
+          }
+        , Cmd.batch
+            [ cartCmd
+            , catalogCmd
+            ]
+        )

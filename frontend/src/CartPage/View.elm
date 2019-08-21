@@ -1,18 +1,14 @@
 module CartPage.View exposing (..)
 
-
 import Html exposing (button, div, h2, Html, i, img, li, span, text, ul)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (class, disabled, src)
-
-
 import List exposing (append, foldl)
 import Checkout
 import CatalogPage.View exposing (formatPrice, productImage)
-import CartPage.Model exposing (..)
-import CartPage.Update exposing (..)
-import CartPage.Message exposing (..)
-import Message exposing (..)
+import CartPage.Model exposing (MaybeOrderedCart(..), Model)
+import CartPage.Message exposing (SubMsg(..))
+import Message exposing (Msg(..))
 
 
 view : Model -> Html Msg

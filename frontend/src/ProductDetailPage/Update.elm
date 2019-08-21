@@ -1,11 +1,11 @@
-module ProductDetailPage.Update exposing (..)
+module ProductDetailPage.Update exposing (update)
 
 import Http
 import Protobuf.Decode as Decode
 import Catalog
-import Message exposing (..)
+import Message exposing (Msg(..))
 import ProductDetailPage.Model exposing (Model(..))
-import ProductDetailPage.Message exposing (..)
+import ProductDetailPage.Message exposing (SubMsg(..))
 
 
 update : SubMsg -> Model -> ( Model, Cmd Msg )

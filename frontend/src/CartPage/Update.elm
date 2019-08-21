@@ -1,12 +1,12 @@
-module CartPage.Update exposing (..)
+module CartPage.Update exposing (update)
 
 import Http
 import Protobuf.Decode as Decode
 import Protobuf.Encode as Encode
 import Checkout
 import CartPage.Model exposing (MaybeOrderedCart(..), Model)
-import Message exposing (..)
-import CartPage.Message exposing (..)
+import Message exposing (Msg(..))
+import CartPage.Message exposing (SubMsg(..))
 
 
 update : SubMsg -> Model -> ( Model, Cmd Msg )
@@ -17,6 +17,9 @@ update msg model =
 
         ( OrderCart, _ ) ->
             ( model, orderCart )
+
+        ( LoadCart, _ ) ->
+            ( model, fetchCart )
 
         ( CartGotChanged (Ok newCart), _ ) ->
             ( { model | cart = Cart newCart, error = Nothing }, Cmd.none )

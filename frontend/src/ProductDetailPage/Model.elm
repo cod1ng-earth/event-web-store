@@ -1,4 +1,4 @@
-module ProductDetailPage.Model exposing (..)
+module ProductDetailPage.Model exposing (Model(..), init)
 
 import Process
 import Task
