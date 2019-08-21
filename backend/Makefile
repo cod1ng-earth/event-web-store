@@ -34,8 +34,6 @@ import: ##@docker Access cli
 
 export GO111MODULE=on
 
-URL = "http://localhost:8080/product?uuid=6e4ff95f-f662-a5ee-e82a-bdf44a2d0b75"
-
 run: ##@host Start the backend
 	air -c air.conf
 
