@@ -1,12 +1,12 @@
 module CartPage.View exposing (..)
 
-import Http
-import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img, input)
-import Html.Events exposing (onClick, onInput)
-import Html.Attributes exposing (href, class, id, disabled, attribute, src, placeholder)
-import Protobuf.Decode as Decode
-import Protobuf.Encode as Encode
-import List exposing (foldl, append)
+
+import Html exposing (button, div, h2, Html, i, img, li, span, text, ul)
+import Html.Events exposing (onClick)
+import Html.Attributes exposing (class, disabled, src)
+
+
+import List exposing (append, foldl)
 import Checkout
 import CatalogPage.View exposing (formatPrice, productImage)
 import CartPage.Model exposing (..)

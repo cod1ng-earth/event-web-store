@@ -1,19 +1,19 @@
 module Model exposing (..)
 
-import Browser
-import Browser.Events exposing (onVisibilityChange, Visibility(..))
-import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img, input)
-import Html.Events exposing (onClick, onInput)
-import Html.Attributes exposing (href, class, id, disabled, attribute, src, placeholder)
-import List exposing (foldl, append)
-import Time
-import Task
-import Random
-import Http
-import Delay
-import Round exposing (round)
-import Catalog
-import Checkout
+
+import Browser.Events exposing (Visibility(..))
+
+
+
+
+
+
+
+
+
+
+
+
 import CatalogPage.Update as CatalogUpdate
 import CartPage.Update as CartPageUpdate
 import CatalogPage.Model as CatalogModel

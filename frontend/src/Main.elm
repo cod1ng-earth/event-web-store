@@ -14,7 +14,7 @@ module Main exposing (main)
 
 import Browser
 import Message exposing (Msg)
-import Model exposing (Model, init)
+import Model exposing (init, Model)
 import View exposing (view)
 import Update exposing (update)
 

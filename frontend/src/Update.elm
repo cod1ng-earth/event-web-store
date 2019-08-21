@@ -1,16 +1,16 @@
 module Update exposing (..)
 
-import Http
-import CartPage.Model
-import CartPage.Message
+
+
+
 import CartPage.Update
-import CatalogPage.Message
+
 import CatalogPage.Model
 import CatalogPage.Update
 import ProductDetailPage.Message exposing (..)
 import ProductDetailPage.Model
 import ProductDetailPage.Update
-import Model exposing (Model, Content(..))
+import Model exposing (Content(..), Model)
 import Message exposing (..)
 
 

@@ -4,7 +4,7 @@ import Http
 import Protobuf.Decode as Decode
 import Protobuf.Encode as Encode
 import Checkout
-import CartPage.Model exposing (Model, MaybeOrderedCart(..), emptyCart)
+import CartPage.Model exposing (MaybeOrderedCart(..), Model)
 import Message exposing (..)
 import CartPage.Message exposing (..)
 

@@ -1,8 +1,8 @@
 module CatalogPage.View exposing (..)
 
-import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img, input)
+import Html exposing (a, button, div, Html, i, img, input, li, span, text, ul)
 import Html.Events exposing (onClick, onInput)
-import Html.Attributes exposing (href, class, id, disabled, attribute, src, placeholder)
+import Html.Attributes exposing (class, disabled, placeholder, src)
 import Char exposing (toCode)
 import String exposing (toList)
 import Catalog

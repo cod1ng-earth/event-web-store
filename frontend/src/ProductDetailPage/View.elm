@@ -1,13 +1,13 @@
 module ProductDetailPage.View exposing (..)
 
-import Html exposing (Html, button, div, text, h1, h2, h3, ol, ul, li, a, span, header, footer, i, img, input)
-import Html.Events exposing (onClick, onInput)
-import Html.Attributes exposing (href, class, id, disabled, attribute, src, placeholder)
-import Http
-import Protobuf.Decode as Decode
-import Catalog
-import Checkout
-import CatalogPage.View exposing (productImage, formatPrice, addToCartButton)
+import Html exposing (div, h1, Html, img, span, text)
+
+import Html.Attributes exposing (class, src)
+
+
+
+
+import CatalogPage.View exposing (addToCartButton, formatPrice, productImage)
 import ProductDetailPage.Model exposing (..)
 import ProductDetailPage.Update exposing (..)
 import ProductDetailPage.Message exposing (..)
