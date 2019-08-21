@@ -1,22 +1,29 @@
 # event driven web shop
 aka Event Thingy Store
 
-## setup
+## setup in docker
+```
+make setup
+```
+
+## setup on host
 Terminal 1
 ```
-docker compose up
+cd shared
+make run
 ```
 
 Terminal 2
 ```
 cd backend
-make start
+make import
+make run
 ```
 
 Terminal 3
 ```
 cd frontend
-make start
+make run
 ```
 
 ## Required tools for development
@@ -50,28 +57,52 @@ sync frontend
 - tab open
 
 backend
+- extract simba
+    - lock: exclusive, sharedread, waitfree
+    - serialize: json, protobuf
+    - configure: massage wrapper
+    - processing: batch & finalize vs single-step
+    - batch only during start vs dynamic selection
+    - [DONE] sync to other contexts before processing commands
+- extend simba to create bridges
+    - share events between contexts
+- production docker image
+- limit cpu and memory use locally
 - remove .uuid
-- after dirty shutdown wait for ip ttl
-- use context specific data structs
-- snapshots
-- share events between contexts
-- generalize context
+- [DONE] use context specific data structs
+- [DONE] generalize context
 - tests for handlers * cqrs & context
-- context with swapable model & read-write lock
+- [DONE] context with swapable model & read-write lock
 - liveness probe / readiness probe
+    - check kafka
+    - remember last connection and let that be the test
+    - the processor needs to signal, that it is stuck (msg unknown)
 - /metrics endpoint for prometheus
-- tracing via jaeger
+    - add model size, writes, writetime, readtime, reads, handler calls to metrics
+    - hook into sarama metrics to expose
 - add timeouts & retries & exponential backoff & shedding & circuitbreaking & avoid thundering heard
 - ensure ordered cart is exactly the cart shown in the browser
-- when triggering an sideeffect, then ensure to do this only once
-- sync to other contexts before processing commands
+- better startup
+    - snapshots
+    - add a confirmation email
+    - when triggering an sideeffect, then ensure to do this only once
+    - after dirty shutdown wait for ip ttl
+- use https://godoc.org/github.com/golang-collections/go-datastructures/slice/skip#SkipList.ByPosition
+- debug
+    - tracing via jaeger
+    - debugger local
+    - debug prod system
+    - cpu & memory profiler
+    - browser events in kafka
+    - copy prod events to local
 
 frontend
+- production image
 - remove .uuid
 - use int32 everywhere https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/latest/#known-limitations
-- use less & cleanup elm
-- use protobuf / remove json
-- use modules
+- use less & cleanup css classes from html elm
+- [DONE] use protobuf / remove json
+- [DONE] use modules
 - use urls & links
 - only process results matching the current model
 - configure backend url
@@ -79,12 +110,15 @@ frontend
 - add timeouts & retries & exponential backoff & shedding & circuitbreaking & avoid thundering heard
 
 general
+- create an uneasy environment https://github.com/Netflix/SimianArmy/tree/master/src/main/resources/scripts
 - e2e tests
-- tilt
-- event browser
 - add pim
-- add search
 - add fulfilment
+- add cms
+- add search
+
+## Not needed anymore
+- tilt
 
 ## Failed ideas
-- use arc cache to skip struct to json marshal
+- use arc cache to skip marshal from struct to json

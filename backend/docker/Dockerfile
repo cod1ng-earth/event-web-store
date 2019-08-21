@@ -17,7 +17,6 @@ WORKDIR /go/src/app
 # The rest of the container's file-system can be read-only
 # e.g via Docker Compose's 'read_only: true'
 # or Kubernetes' pod security policy 'ReadOnlyRootFilesystem'
-#VOLUME ["/root/.cache/go-build", ""]
 RUN mkdir -p /.cache/go-build /go/pkg && \
     chmod 777 /.cache/go-build /go/pkg
 VOLUME ["/tmp", "/go/pkg", "/.cache/go-build"]
