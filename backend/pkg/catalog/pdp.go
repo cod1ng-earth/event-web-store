@@ -3,12 +3,16 @@ package catalog
 import (
 	"log"
 	"net/http"
+	_ "time" // show "loading..." in the frontend
 
 	"github.com/golang/protobuf/proto"
 )
 
 func (c *context) NewPDPHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		// time.Sleep(2 * time.Second) // show "loading..." in the frontend
+
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
 
 		uuid := r.URL.Query().Get("uuid")

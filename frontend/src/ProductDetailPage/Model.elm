@@ -1,14 +1,25 @@
 module ProductDetailPage.Model exposing (..)
 
+import Process
+import Task
+import Time
 import Catalog
 import Message exposing (Msg)
+import ProductDetailPage.Message exposing (SubMsg(..))
 
 
 type Model
     = Loading
-    | Error String
-    | Product Catalog.Product
+    | LoadingSlowly
+    | Loaded Catalog.Product
+    | Failed String
 
 
-init : Model
-init = Loading
+init : String -> ( Model, Cmd Msg )
+init id =
+    ( Loading
+    , Cmd.batch
+        [ Task.perform (\_ -> Message.ProductDetailPageMsg (LoadProduct id)) Time.here
+        , Task.perform (\_ -> Message.ProductDetailPageMsg PassedSlowLoadThreshold) (Process.sleep 500)
+        ]
+    )

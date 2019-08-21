@@ -8,7 +8,7 @@ import Protobuf.Decode as Decode
 import Catalog
 import Checkout
 import CatalogPage.View exposing (productImage, formatPrice, addToCartButton)
-import ProductDetailPage.Model exposing (Model)
+import ProductDetailPage.Model exposing (..)
 import ProductDetailPage.Update exposing (..)
 import ProductDetailPage.Message exposing (..)
 import Message exposing (..)
@@ -18,12 +18,12 @@ view : Model -> Html Msg
 view model =
     case model of
         Loading ->
+            text ""
+
+        LoadingSlowly ->
             text "loading..."
 
-        Error err ->
-            text err
-
-        Product product ->
+        Loaded product ->
             div [ class "mdl-grid" ]
                 [ div [ class "mdl-cell mdl-cell--12-col" ] [ h1 [] [ text product.title ] ]
                 , div [ class "mdl-cell mdl-cell--8-col" ] [ img [ class "custom-detail-image", src (productImage product.id 400 200) ] [] ]
@@ -35,3 +35,6 @@ view model =
                     , span [] [ addToCartButton product.id ]
                     ]
                 ]
+
+        Failed err ->
+            text err

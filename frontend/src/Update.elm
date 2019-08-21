@@ -45,7 +45,11 @@ update msg model =
             ( { model | content = CatalogPage CatalogPage.Model.init }, CatalogPage.Update.fetchProducts CatalogPage.Model.init )
 
         ( ShowProductDetailPage id, _ ) ->
-            ( { model | content = ProductDetailPage ProductDetailPage.Model.init }, ProductDetailPage.Update.fetchProduct id )
+            let
+                ( updatedModel, cmd ) =
+                    ProductDetailPage.Model.init id
+            in
+                ( { model | content = ProductDetailPage updatedModel }, cmd )
 
         ( _, _ ) ->
             -- this means a msg was send for a currently not active content

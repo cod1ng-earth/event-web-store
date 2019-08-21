@@ -4,30 +4,36 @@ import Http
 import Protobuf.Decode as Decode
 import Catalog
 import Message exposing (..)
-import ProductDetailPage.Model exposing (Model)
+import ProductDetailPage.Model exposing (Model(..))
 import ProductDetailPage.Message exposing (..)
 
 
 update : SubMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        LoadProduct uuid ->
-            ( model, fetchProduct uuid )
+    case ( msg, model ) of
+        ( PassedSlowLoadThreshold, Loading ) ->
+            ( LoadingSlowly, Cmd.none )
 
-        ProductFetched result ->
+        ( PassedSlowLoadThreshold, _ ) ->
+            ( model, Cmd.none )
+
+        ( ProductFetched result, _ ) ->
             case result of
                 Ok p ->
-                    ( { model | product = Just p, error = Nothing }, Cmd.none )
+                    ( Loaded p, Cmd.none )
 
                 Err e ->
-                    ( { model | product = Nothing, error = Just (toString e) }, Cmd.none )
+                    ( Failed (toString e), Cmd.none )
+
+        ( LoadProduct id, _ ) ->
+            ( model, fetchProduct id )
 
 
 fetchProduct : String -> Cmd Msg
 fetchProduct id =
     Http.get
         { url = "http://localhost:8080/product?uuid=" ++ id
-        , expect = Decode.expectBytes GotProduct Catalog.productDecoder
+        , expect = Decode.expectBytes ProductFetched Catalog.productDecoder
         }
         |> Cmd.map ProductDetailPageMsg
 
