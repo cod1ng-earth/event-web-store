@@ -12,9 +12,8 @@ WORKDIR /app
 # The rest of the container's file-system can be read-only
 # e.g via Docker Compose's 'read_only: true'
 # or Kubernetes' pod security policy 'ReadOnlyRootFilesystem'
-RUN mkdir -p /home/node/.elm /app/elm-stuff && \
-    chmod 777 /home/node/.elm /app/elm-stuff
-VOLUME ["/home/node/.elm", "/app/elm-stuff", "/tmp"]
+RUN mkdir -p /.elm /app/elm-stuff && \
+    chmod 777 /.elm /app/elm-stuff
+VOLUME ["/.elm", "/app/elm-stuff", "/tmp"]
 
-#USER 65635
 CMD [ "make", "run" ]

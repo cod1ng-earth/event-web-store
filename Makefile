@@ -3,16 +3,14 @@ include ./shared/etc/help.mk
 include ./shared/etc/chaos-network.mk
 
 setup: ##@docker Start all conponents and import products
-	cd frontend && make start
-	cd backend && make start
-	cd shared && make start
+	$(MAKE) start
 	cd backend && make import
 .PHONY: setup
 
 start: ## Start all components
-	cd frontend && make start
-	cd backend && make start
 	cd shared && make start
+	cd backend && make start
+	cd frontend && make start
 .PHONY: start
 
 stop: ## Stop all components
