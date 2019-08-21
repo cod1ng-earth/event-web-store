@@ -4,13 +4,15 @@ import Checkout
 
 
 type alias Model =
-    { cart: MaybeOrderedCart
+    { cart : MaybeOrderedCart
     , error : Maybe String
     }
+
 
 type MaybeOrderedCart
     = Cart Checkout.Cart
     | OrderedCart
+
 
 init : Model
 init =
@@ -18,4 +20,6 @@ init =
     , error = Nothing
     }
 
-emptyCart = Checkout.Cart "" []
+
+emptyCart =
+    Checkout.Cart "" []

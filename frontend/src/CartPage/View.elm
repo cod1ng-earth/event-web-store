@@ -20,11 +20,13 @@ view model =
     case model.cart of
         Cart cart ->
             let
-                error = case model.error of
-                    Nothing ->
-                        text ""
-                    Just e ->
-                        text e
+                error =
+                    case model.error of
+                        Nothing ->
+                            text ""
+
+                        Just e ->
+                            text e
 
                 head =
                     List.map (\l -> renderCartItem l) cart.positions
@@ -33,10 +35,13 @@ view model =
                     [ li [] [ button [ class "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent", onClick (CartPageMsg OrderCart) ] [ text "Order Now" ] ] ]
             in
                 div []
-                [ error
-                , ul [ class "product-list mdl-list" ] (append head tail)
-                ]
-        OrderedCart -> h2 [] [ text "Cart ordered sucessfully" ]
+                    [ error
+                    , ul [ class "product-list mdl-list" ] (append head tail)
+                    ]
+
+        OrderedCart ->
+            h2 [] [ text "Cart ordered sucessfully" ]
+
 
 renderCartItem : Checkout.Position -> Html Msg
 renderCartItem item =
@@ -92,6 +97,7 @@ itemsInCart maybeOrderedCart =
                     String.fromInt inStock
                 else
                     String.fromInt (inStock + outOfStock) ++ "-" ++ String.fromInt outOfStock
+
         OrderedCart ->
             "0"
 

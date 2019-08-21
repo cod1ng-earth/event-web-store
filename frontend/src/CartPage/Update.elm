@@ -11,27 +11,27 @@ import CartPage.Message exposing (..)
 
 update : SubMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case (msg, model.cart) of
-        (ChangeProductQuantity uuid quantity, _) ->
+    case ( msg, model.cart ) of
+        ( ChangeProductQuantity uuid quantity, _ ) ->
             ( model, updateCart (Checkout.ChangeProductQuantity "" uuid quantity) )
 
-        (OrderCart, _) ->
+        ( OrderCart, _ ) ->
             ( model, orderCart )
 
-        (CartGotChanged (Ok newCart), _) ->
+        ( CartGotChanged (Ok newCart), _ ) ->
             ( { model | cart = Cart newCart, error = Nothing }, Cmd.none )
 
-        (CartGotChanged (Err e), _) ->
+        ( CartGotChanged (Err e), _ ) ->
             ( { model | error = Just (toString e) }, Cmd.none )
 
-        (CartGotOrdered (Ok orderState), _) ->
-            if orderState.successful then                        
+        ( CartGotOrdered (Ok orderState), _ ) ->
+            if orderState.successful then
                 ( { model | cart = OrderedCart, error = Nothing }, Cmd.none )
             else
-                ( { model | error = Just "failed to order cart" }, Cmd.none ) 
+                ( { model | error = Just "failed to order cart" }, Cmd.none )
 
-        (CartGotOrdered (Err e), _) ->
-            ( { model | error = Just (toString e) }, Cmd.none )               
+        ( CartGotOrdered (Err e), _ ) ->
+            ( { model | error = Just (toString e) }, Cmd.none )
 
 
 toString : Http.Error -> String

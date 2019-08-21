@@ -1,32 +1,39 @@
 # event driven web shop
+
 aka Event Thingy Store
 
 ## setup in docker
-```
+
+``` bash
 make setup
 ```
 
 ## setup on host
+
 Terminal 1
-```
+
+``` bash
 cd shared
 make run
 ```
 
 Terminal 2
-```
+
+``` bash
 cd backend
 make import
 make run
 ```
 
 Terminal 3
-```
+
+``` bash
 cd frontend
 make run
 ```
 
 ## Required tools for development
+
 - golang
 - air https://github.com/cosmtrek/air
 - elm
@@ -35,8 +42,8 @@ make run
 - protoc-gen-elm https://www.npmjs.com/package/protoc-gen-elm
 - docker
 
-
 ## Features
+
 - automatic rebuild backend
 - automatic rebuild frontend
 - wait free reads
@@ -44,6 +51,7 @@ make run
 - load all data before starting to serve requests
 
 ## Rules
+
 - keep read short
 - all state exists as persisted event / kafka is the only source of truth
 - avoid (syncronous) network calls
@@ -52,20 +60,22 @@ make run
 ## Roadmap
 
 sync frontend
+
 - websocket
 - localstorage
 - tab open
 
 backend
+
 - extract simba
-    - lock: exclusive, sharedread, waitfree
-    - serialize: json, protobuf
-    - configure: massage wrapper
-    - processing: batch & finalize vs single-step
-    - batch only during start vs dynamic selection
-    - [DONE] sync to other contexts before processing commands
+  - lock: exclusive, sharedread, waitfree
+  - serialize: json, protobuf
+  - configure: massage wrapper
+  - processing: batch & finalize vs single-step
+  - batch only during start vs dynamic selection
+  - [DONE] sync to other contexts before processing commands
 - extend simba to create bridges
-    - share events between contexts
+  - share events between contexts
 - production docker image
 - limit cpu and memory use locally
 - remove .uuid
@@ -74,29 +84,30 @@ backend
 - tests for handlers * cqrs & context
 - [DONE] context with swapable model & read-write lock
 - liveness probe / readiness probe
-    - check kafka
-    - remember last connection and let that be the test
-    - the processor needs to signal, that it is stuck (msg unknown)
+  - check kafka
+  - remember last connection and let that be the test
+  - the processor needs to signal, that it is stuck (msg unknown)
 - /metrics endpoint for prometheus
-    - add model size, writes, writetime, readtime, reads, handler calls to metrics
-    - hook into sarama metrics to expose
+  - add model size, writes, writetime, readtime, reads, handler calls to metrics
+  - hook into sarama metrics to expose
 - add timeouts & retries & exponential backoff & shedding & circuitbreaking & avoid thundering heard
 - ensure ordered cart is exactly the cart shown in the browser
 - better startup
-    - snapshots
-    - add a confirmation email
-    - when triggering an sideeffect, then ensure to do this only once
-    - after dirty shutdown wait for ip ttl
+  - snapshots
+  - add a confirmation email
+  - when triggering an sideeffect, then ensure to do this only once
+  - after dirty shutdown wait for ip ttl
 - use https://godoc.org/github.com/golang-collections/go-datastructures/slice/skip#SkipList.ByPosition
 - debug
-    - tracing via jaeger
-    - debugger local
-    - debug prod system
-    - cpu & memory profiler
-    - browser events in kafka
-    - copy prod events to local
+  - tracing via jaeger
+  - debugger local
+  - debug prod system
+  - cpu & memory profiler
+  - browser events in kafka
+  - copy prod events to local
 
 frontend
+
 - production image
 - remove .uuid
 - use int32 everywhere https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/latest/#known-limitations
@@ -110,6 +121,7 @@ frontend
 - add timeouts & retries & exponential backoff & shedding & circuitbreaking & avoid thundering heard
 
 general
+
 - create an uneasy environment https://github.com/Netflix/SimianArmy/tree/master/src/main/resources/scripts
 - e2e tests
 - add pim
@@ -118,7 +130,9 @@ general
 - add search
 
 ## Not needed anymore
+
 - tilt
 
 ## Failed ideas
+
 - use arc cache to skip marshal from struct to json
