@@ -16,23 +16,22 @@ import Message exposing (..)
 
 view : Model -> Html Msg
 view model =
-    let
-        maybeProduct =
-            model.product
-    in
-        case maybeProduct of
-            Nothing ->
-                text "sorry no product"
+    case model of
+        Loading ->
+            text "loading..."
 
-            Just product ->
-                div [ class "mdl-grid" ]
-                    [ div [ class "mdl-cell mdl-cell--12-col" ] [ h1 [] [ text product.title ] ]
-                    , div [ class "mdl-cell mdl-cell--8-col" ] [ img [ class "custom-detail-image", src (productImage product.id 400 200) ] [] ]
-                    , div [ class "mdl-cell mdl-cell--4-col" ]
-                        [ span [ class "custom-detail-block" ] [ text ("id: " ++ product.id) ]
-                        , span [ class "mdl-typography--headline custom-detail-block" ] [ text product.description ]
-                        , span [ class "custom-detail-block" ] [ text product.longtext ]
-                        , span [ class "mdl-typography--display-1 custom-detail-block" ] [ text (formatPrice product.price) ]
-                        , span [] [ addToCartButton product.id ]
-                        ]
+        Error err ->
+            text err
+
+        Product product ->
+            div [ class "mdl-grid" ]
+                [ div [ class "mdl-cell mdl-cell--12-col" ] [ h1 [] [ text product.title ] ]
+                , div [ class "mdl-cell mdl-cell--8-col" ] [ img [ class "custom-detail-image", src (productImage product.id 400 200) ] [] ]
+                , div [ class "mdl-cell mdl-cell--4-col" ]
+                    [ span [ class "custom-detail-block" ] [ text ("id: " ++ product.id) ]
+                    , span [ class "mdl-typography--headline custom-detail-block" ] [ text product.description ]
+                    , span [ class "custom-detail-block" ] [ text product.longtext ]
+                    , span [ class "mdl-typography--display-1 custom-detail-block" ] [ text (formatPrice product.price) ]
+                    , span [] [ addToCartButton product.id ]
                     ]
+                ]

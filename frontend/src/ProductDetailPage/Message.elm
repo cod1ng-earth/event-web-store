@@ -6,4 +6,4 @@ import Catalog
 
 type SubMsg
     = LoadProduct String
-    | GotProduct (Result Http.Error Catalog.Product)
+    | ProductFetched (Result Http.Error Catalog.Product)

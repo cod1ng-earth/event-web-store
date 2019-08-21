@@ -14,7 +14,7 @@ update msg model =
         LoadProduct uuid ->
             ( model, fetchProduct uuid )
 
-        GotProduct result ->
+        ProductFetched result ->
             case result of
                 Ok p ->
                     ( { model | product = Just p, error = Nothing }, Cmd.none )
