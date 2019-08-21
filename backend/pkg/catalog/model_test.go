@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/pb"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/pb"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 )

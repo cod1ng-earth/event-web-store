@@ -1,4 +1,4 @@
-module git.votum-media.net/event-web-store/event-web-store
+module github.com/cod1ng-earth/event-web-store/shared
 
 go 1.12
 

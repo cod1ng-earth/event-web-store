@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/simba"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/simba"
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 )

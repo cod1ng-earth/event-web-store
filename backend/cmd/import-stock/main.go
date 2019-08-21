@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"git.votum-media.net/event-web-store/event-web-store/backend/pkg/checkout"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/checkout"
 )
 
 var (
