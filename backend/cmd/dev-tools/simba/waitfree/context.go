@@ -1,4 +1,4 @@
-package catalog
+package {{ .Name }}
 
 import (
 	"log"
@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	Topic     = "products"
+	Topic     = "{{ .Name }}"
 	Partition = 0
 )
 
@@ -22,6 +22,15 @@ type context struct {
 
 	batchOffset int64
 
+{{ if eq .Lock "exclusive" }}
+	model  *model
+	lock   sync.Mutex
+	writes chan *sarama.ConsumerMessage
+{{ else if eq .Lock "parallel" }}
+	model  *model
+	lock   sync.RWMutex
+	writes chan *sarama.ConsumerMessage
+{{ else if eq .Lock "wait-free" }}
 	readerAChanged *sync.Cond
 	readerBChanged *sync.Cond
 	aIsReading     bool
@@ -32,6 +41,7 @@ type context struct {
 
 	writes     chan *sarama.ConsumerMessage
 	writesRedo chan *sarama.ConsumerMessage
+{{ end }}
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -58,8 +68,6 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	}
 	batchOffset--
 
-	//	batchOffset -= 50000
-
 	context := context{
 		doneCh:    make(chan struct{}, 1),
 		client:    client,
@@ -68,14 +76,29 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 
 		batchOffset: batchOffset,
 
-		aIsReading:     true,
-		modelA:         newModel(),
-		modelB:         newModel(),
-		offsetChanged:  sync.NewCond(&sync.Mutex{}),
+	{{ if eq .Lock "exclusive" }}
+		model:  newModel(),
+		lock:   &sync.Mutex{},
+		writes: make(chan *sarama.ConsumerMessage, 32768),
+	{{ else if eq .Lock "parallel" }}
+		model:  newModel(),
+		lock:   &sync.RWMutex{},
+		writes: make(chan *sarama.ConsumerMessage, 32768),
+	{{ else if eq .Lock "wait-free" }}
 		readerAChanged: sync.NewCond(&sync.Mutex{}),
 		readerBChanged: sync.NewCond(&sync.Mutex{}),
-		writes:         make(chan *sarama.ConsumerMessage, 32768),
-		writesRedo:     make(chan *sarama.ConsumerMessage, 32768),
+		aIsReading:     true,
+		readersA:		0,
+		readersB:		0,
+		modelA:         newModel(),
+		modelB:         newModel(),
+
+		writes:     make(chan *sarama.ConsumerMessage, 32768),
+		writesRedo: make(chan *sarama.ConsumerMessage, 32768),
+	{{ end }}
+
+		offset:        0,
+		offsetChanged: sync.NewCond(&sync.Mutex{}),
 	}
 	return context
 }
@@ -85,17 +108,11 @@ func (c *context) Stop() {
 }
 
 func (c *context) AwaitLastOffset() {
-	log.Printf("waiting for offset %v", c.batchOffset)
 	c.offsetChanged.L.Lock()
 	for c.offset < c.batchOffset {
 		c.offsetChanged.Wait()
 	}
 	c.offsetChanged.L.Unlock()
-	log.Printf("watermark %v for topic %v reached", c.batchOffset, Topic)
-
-	m, cl := c.read()
-	defer cl()
-	log.Printf("products count: %v", len(m.products))
 }
 
 func (c *context) updateLoop() {
@@ -104,6 +121,11 @@ func (c *context) updateLoop() {
 	var start time.Time
 
 	for {
+	{{ if eq .Lock "exclusive" }}
+		applyChange(msg, c.model, c)
+	{{ else if eq .Lock "parallel" }}
+		applyChange(msg, c.model, c)
+	{{ else if eq .Lock "wait-free" }}
 		writeDelay := 0 * time.Second
 
 		model := c.modelA
@@ -150,34 +172,38 @@ func (c *context) updateLoop() {
 			writeDelay += time.Since(start)
 		}
 
-		start = time.Now()
-		if msg.Offset >= c.batchOffset {
-			modelRealtimeFinalizer(model)
-		}
-		finalizeDelay := time.Since(start)
-		if finalizeDelay > 200*time.Millisecond {
-			log.Printf("finalize took %v to execute", finalizeDelay)
-		}
-
 		c.aIsReading = !c.aIsReading
 		c.offset = offset
 		c.offsetChanged.Broadcast()
+	{{ end }}
 	}
 
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
+
+{{ if eq .Lock "exclusive" }}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+{{ else if eq .Lock "parallel" }}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+{{ end }}
+
+{{ if .Batch }}
 	if msg.Offset < c.batchOffset {
-		modelBatchUpdater(msg, m)
+		batchUpdateModel(msg, m)
 	} else if msg.Offset == c.batchOffset {
-		modelBatchUpdater(msg, m)
-		modelBatchFinalizer(m)
+		batchUpdateModel(msg, m)
+		batchFinalizeModel(m)
 	} else {
-		modelRealtimeUpdater(msg, m)
+		updateModel(msg, m)
 	}
+{{ else }}
+	updateModel(msg, m)
+{{ end }}
 }
 
-// Start listens for events from kafka
 func (c *context) Start() {
 
 	log.Printf("starting context %v", Topic)
@@ -210,8 +236,18 @@ func (c *context) Start() {
 }
 
 func (c *context) read() (*model, func()) {
-	//	log.Printf("A: %v, B: %v, Offset: %v", atomic.LoadInt32(&c.readersA), atomic.LoadInt32(&c.readersB), c.offset)
 
+	if msg.Offset < c.batchOffset {
+		c.AwaitLastOffset()
+	}
+
+{{ if eq .Lock "exclusive" }}
+	c.lock.Lock()
+	return model, c.lock.Unlock
+{{ else if eq .Lock "parallel" }}
+	c.lock.RLock()
+	return model, c.lock.Unlock
+{{ else if eq .Lock "wait-free" }}
 	atomic.AddInt32(&c.readersA, 1)
 	atomic.AddInt32(&c.readersB, 1)
 
@@ -230,5 +266,61 @@ func (c *context) read() (*model, func()) {
 		atomic.AddInt32(&c.readersB, -1)
 		c.readerBChanged.Signal()
 	}
+{{ end }}
+}
 
+{{ if .Batch }}
+func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
+	cc := {{ .Name | title }}Messages{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+	}
+
+	defer func() { offset = msg.Offset }()
+
+	switch x := cc.Get{{ .Name | title }}Message().(type) {
+
+	{{ range .MessageNames }}
+	case *{{ $.Name | title }}Messages_{{ . | title }}:
+		if err := batchUpdateModel{{ . | title }}(cc.Get{{ . | title }}(), offset); err != nil {
+			return err
+		}
+	{{ end }}
+
+	case nil:
+		panic(fmt.Sprintf("context message is empty"))
+
+	default:
+		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	}
+	return nil
+}
+{{ end }}
+
+func updateModel(msg *sarama.ConsumerMessage, model *model) error {
+	cc := CheckoutMessages{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+	}
+
+	defer func() { offset = msg.Offset }()
+
+	switch x := cc.Get{{ .Name | title }}Message().(type) {
+
+	{{ range .MessageNames }}
+	case *{{ $.Name | title }}Messages_{{ . | title }}:
+		if err := updateModel{{ . | title }}(cc.Get{{ . | title }}(), offset); err != nil {
+			return err
+		}
+	{{ end }}
+
+	case nil:
+		panic(fmt.Sprintf("checkout context message is empty"))
+
+	default:
+		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	}
+	return nil
 }

@@ -4,8 +4,8 @@ package checkout;
 
 // import public "catalog.proto";
 
-message CheckoutContext {
-    oneof checkoutContextMsg {
+message CheckoutMessages {
+    oneof checkoutMessage {
         ChangeProductQuantity changeProductQuantity = 1;
         Stock stock = 2;
         Product product = 3;

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	Topic     = "products"
+	Topic     = "catalog"
 	Partition = 0
 )
 
@@ -22,6 +22,7 @@ type context struct {
 
 	batchOffset int64
 
+
 	readerAChanged *sync.Cond
 	readerBChanged *sync.Cond
 	aIsReading     bool
@@ -32,6 +33,7 @@ type context struct {
 
 	writes     chan *sarama.ConsumerMessage
 	writesRedo chan *sarama.ConsumerMessage
+
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -58,8 +60,6 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	}
 	batchOffset--
 
-	//	batchOffset -= 50000
-
 	context := context{
 		doneCh:    make(chan struct{}, 1),
 		client:    client,
@@ -68,14 +68,21 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 
 		batchOffset: batchOffset,
 
-		aIsReading:     true,
-		modelA:         newModel(),
-		modelB:         newModel(),
-		offsetChanged:  sync.NewCond(&sync.Mutex{}),
+	
 		readerAChanged: sync.NewCond(&sync.Mutex{}),
 		readerBChanged: sync.NewCond(&sync.Mutex{}),
-		writes:         make(chan *sarama.ConsumerMessage, 32768),
-		writesRedo:     make(chan *sarama.ConsumerMessage, 32768),
+		aIsReading:     true,
+		readersA:		0,
+		readersB:		0,
+		modelA:         newModel(),
+		modelB:         newModel(),
+
+		writes:     make(chan *sarama.ConsumerMessage, 32768),
+		writesRedo: make(chan *sarama.ConsumerMessage, 32768),
+	
+
+		offset:        0,
+		offsetChanged: sync.NewCond(&sync.Mutex{}),
 	}
 	return context
 }
@@ -85,18 +92,11 @@ func (c *context) Stop() {
 }
 
 func (c *context) AwaitLastOffset() {
-	log.Printf("waiting for offset %v", c.batchOffset)
 	c.offsetChanged.L.Lock()
 	for c.offset < c.batchOffset {
 		c.offsetChanged.Wait()
 	}
 	c.offsetChanged.L.Unlock()
-	log.Printf("watermark %v for topic %v reached", c.batchOffset, Topic)
-
-	m, cl := c.read()
-	defer cl()
-	log.Printf("products count: %v", len(m.products))
-
 }
 
 func (c *context) updateLoop() {
@@ -105,6 +105,7 @@ func (c *context) updateLoop() {
 	var start time.Time
 
 	for {
+	
 		writeDelay := 0 * time.Second
 
 		model := c.modelA
@@ -151,34 +152,30 @@ func (c *context) updateLoop() {
 			writeDelay += time.Since(start)
 		}
 
-		start = time.Now()
-		if msg.Offset >= c.batchOffset {
-			modelRealtimeFinalizer(model)
-		}
-		finalizeDelay := time.Since(start)
-		if finalizeDelay > 200*time.Millisecond {
-			log.Printf("finalize took %v to execute", finalizeDelay)
-		}
-
 		c.aIsReading = !c.aIsReading
 		c.offset = offset
 		c.offsetChanged.Broadcast()
+	
 	}
 
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
+
+
+
+
 	if msg.Offset < c.batchOffset {
-		modelBatchUpdater(msg, m)
+		batchUpdateModel(msg, m)
 	} else if msg.Offset == c.batchOffset {
-		modelBatchUpdater(msg, m)
-		modelBatchFinalizer(m)
+		batchUpdateModel(msg, m)
+		batchFinalizeModel(m)
 	} else {
-		modelRealtimeUpdater(msg, m)
+		updateModel(msg, m)
 	}
+
 }
 
-// Start listens for events from kafka
 func (c *context) Start() {
 
 	log.Printf("starting context %v", Topic)
@@ -211,7 +208,11 @@ func (c *context) Start() {
 }
 
 func (c *context) read() (*model, func()) {
-	//	log.Printf("A: %v, B: %v, Offset: %v", atomic.LoadInt32(&c.readersA), atomic.LoadInt32(&c.readersB), c.offset)
+
+	if msg.Offset < c.batchOffset {
+		c.AwaitLastOffset()
+	}
+
 
 	atomic.AddInt32(&c.readersA, 1)
 	atomic.AddInt32(&c.readersB, 1)
@@ -232,4 +233,60 @@ func (c *context) read() (*model, func()) {
 		c.readerBChanged.Signal()
 	}
 
+}
+
+
+func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
+	cc := CatalogMessages{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+	}
+
+	defer func() { offset = msg.Offset }()
+
+	switch x := cc.GetCatalogMessage().(type) {
+
+	
+	case *CatalogMessages_Product:
+		if err := batchUpdateModelProduct(cc.GetProduct(), offset); err != nil {
+			return err
+		}
+	
+
+	case nil:
+		panic(fmt.Sprintf("context message is empty"))
+
+	default:
+		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	}
+	return nil
+}
+
+
+func updateModel(msg *sarama.ConsumerMessage, model *model) error {
+	cc := CheckoutMessages{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+	}
+
+	defer func() { offset = msg.Offset }()
+
+	switch x := cc.GetCatalogMessage().(type) {
+
+	
+	case *CatalogMessages_Product:
+		if err := updateModelProduct(cc.GetProduct(), offset); err != nil {
+			return err
+		}
+	
+
+	case nil:
+		panic(fmt.Sprintf("checkout context message is empty"))
+
+	default:
+		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	}
+	return nil
 }

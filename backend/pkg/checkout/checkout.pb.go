@@ -18,206 +18,206 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-type CheckoutContext struct {
-	// Types that are valid to be assigned to CheckoutContextMsg:
-	//	*CheckoutContext_ChangeProductQuantity
-	//	*CheckoutContext_Stock
-	//	*CheckoutContext_Product
-	//	*CheckoutContext_CartOrder
-	CheckoutContextMsg   isCheckoutContext_CheckoutContextMsg `protobuf_oneof:"checkoutContextMsg"`
-	XXX_NoUnkeyedLiteral struct{}                             `json:"-"`
-	XXX_unrecognized     []byte                               `json:"-"`
-	XXX_sizecache        int32                                `json:"-"`
+type CheckoutMessages struct {
+	// Types that are valid to be assigned to CheckoutMessage:
+	//	*CheckoutMessages_ChangeProductQuantity
+	//	*CheckoutMessages_Stock
+	//	*CheckoutMessages_Product
+	//	*CheckoutMessages_CartOrder
+	CheckoutMessage      isCheckoutMessages_CheckoutMessage `protobuf_oneof:"checkoutMessage"`
+	XXX_NoUnkeyedLiteral struct{}                           `json:"-"`
+	XXX_unrecognized     []byte                             `json:"-"`
+	XXX_sizecache        int32                              `json:"-"`
 }
 
-func (m *CheckoutContext) Reset()         { *m = CheckoutContext{} }
-func (m *CheckoutContext) String() string { return proto.CompactTextString(m) }
-func (*CheckoutContext) ProtoMessage()    {}
-func (*CheckoutContext) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{0}
+func (m *CheckoutMessages) Reset()         { *m = CheckoutMessages{} }
+func (m *CheckoutMessages) String() string { return proto.CompactTextString(m) }
+func (*CheckoutMessages) ProtoMessage()    {}
+func (*CheckoutMessages) Descriptor() ([]byte, []int) {
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{0}
 }
-func (m *CheckoutContext) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_CheckoutContext.Unmarshal(m, b)
+func (m *CheckoutMessages) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_CheckoutMessages.Unmarshal(m, b)
 }
-func (m *CheckoutContext) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_CheckoutContext.Marshal(b, m, deterministic)
+func (m *CheckoutMessages) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_CheckoutMessages.Marshal(b, m, deterministic)
 }
-func (dst *CheckoutContext) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CheckoutContext.Merge(dst, src)
+func (dst *CheckoutMessages) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CheckoutMessages.Merge(dst, src)
 }
-func (m *CheckoutContext) XXX_Size() int {
-	return xxx_messageInfo_CheckoutContext.Size(m)
+func (m *CheckoutMessages) XXX_Size() int {
+	return xxx_messageInfo_CheckoutMessages.Size(m)
 }
-func (m *CheckoutContext) XXX_DiscardUnknown() {
-	xxx_messageInfo_CheckoutContext.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_CheckoutContext proto.InternalMessageInfo
-
-type isCheckoutContext_CheckoutContextMsg interface {
-	isCheckoutContext_CheckoutContextMsg()
+func (m *CheckoutMessages) XXX_DiscardUnknown() {
+	xxx_messageInfo_CheckoutMessages.DiscardUnknown(m)
 }
 
-type CheckoutContext_ChangeProductQuantity struct {
+var xxx_messageInfo_CheckoutMessages proto.InternalMessageInfo
+
+type isCheckoutMessages_CheckoutMessage interface {
+	isCheckoutMessages_CheckoutMessage()
+}
+
+type CheckoutMessages_ChangeProductQuantity struct {
 	ChangeProductQuantity *ChangeProductQuantity `protobuf:"bytes,1,opt,name=changeProductQuantity,proto3,oneof"`
 }
 
-type CheckoutContext_Stock struct {
+type CheckoutMessages_Stock struct {
 	Stock *Stock `protobuf:"bytes,2,opt,name=stock,proto3,oneof"`
 }
 
-type CheckoutContext_Product struct {
+type CheckoutMessages_Product struct {
 	Product *Product `protobuf:"bytes,3,opt,name=product,proto3,oneof"`
 }
 
-type CheckoutContext_CartOrder struct {
+type CheckoutMessages_CartOrder struct {
 	CartOrder *OrderCart `protobuf:"bytes,4,opt,name=cartOrder,proto3,oneof"`
 }
 
-func (*CheckoutContext_ChangeProductQuantity) isCheckoutContext_CheckoutContextMsg() {}
+func (*CheckoutMessages_ChangeProductQuantity) isCheckoutMessages_CheckoutMessage() {}
 
-func (*CheckoutContext_Stock) isCheckoutContext_CheckoutContextMsg() {}
+func (*CheckoutMessages_Stock) isCheckoutMessages_CheckoutMessage() {}
 
-func (*CheckoutContext_Product) isCheckoutContext_CheckoutContextMsg() {}
+func (*CheckoutMessages_Product) isCheckoutMessages_CheckoutMessage() {}
 
-func (*CheckoutContext_CartOrder) isCheckoutContext_CheckoutContextMsg() {}
+func (*CheckoutMessages_CartOrder) isCheckoutMessages_CheckoutMessage() {}
 
-func (m *CheckoutContext) GetCheckoutContextMsg() isCheckoutContext_CheckoutContextMsg {
+func (m *CheckoutMessages) GetCheckoutMessage() isCheckoutMessages_CheckoutMessage {
 	if m != nil {
-		return m.CheckoutContextMsg
+		return m.CheckoutMessage
 	}
 	return nil
 }
 
-func (m *CheckoutContext) GetChangeProductQuantity() *ChangeProductQuantity {
-	if x, ok := m.GetCheckoutContextMsg().(*CheckoutContext_ChangeProductQuantity); ok {
+func (m *CheckoutMessages) GetChangeProductQuantity() *ChangeProductQuantity {
+	if x, ok := m.GetCheckoutMessage().(*CheckoutMessages_ChangeProductQuantity); ok {
 		return x.ChangeProductQuantity
 	}
 	return nil
 }
 
-func (m *CheckoutContext) GetStock() *Stock {
-	if x, ok := m.GetCheckoutContextMsg().(*CheckoutContext_Stock); ok {
+func (m *CheckoutMessages) GetStock() *Stock {
+	if x, ok := m.GetCheckoutMessage().(*CheckoutMessages_Stock); ok {
 		return x.Stock
 	}
 	return nil
 }
 
-func (m *CheckoutContext) GetProduct() *Product {
-	if x, ok := m.GetCheckoutContextMsg().(*CheckoutContext_Product); ok {
+func (m *CheckoutMessages) GetProduct() *Product {
+	if x, ok := m.GetCheckoutMessage().(*CheckoutMessages_Product); ok {
 		return x.Product
 	}
 	return nil
 }
 
-func (m *CheckoutContext) GetCartOrder() *OrderCart {
-	if x, ok := m.GetCheckoutContextMsg().(*CheckoutContext_CartOrder); ok {
+func (m *CheckoutMessages) GetCartOrder() *OrderCart {
+	if x, ok := m.GetCheckoutMessage().(*CheckoutMessages_CartOrder); ok {
 		return x.CartOrder
 	}
 	return nil
 }
 
 // XXX_OneofFuncs is for the internal use of the proto package.
-func (*CheckoutContext) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _CheckoutContext_OneofMarshaler, _CheckoutContext_OneofUnmarshaler, _CheckoutContext_OneofSizer, []interface{}{
-		(*CheckoutContext_ChangeProductQuantity)(nil),
-		(*CheckoutContext_Stock)(nil),
-		(*CheckoutContext_Product)(nil),
-		(*CheckoutContext_CartOrder)(nil),
+func (*CheckoutMessages) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _CheckoutMessages_OneofMarshaler, _CheckoutMessages_OneofUnmarshaler, _CheckoutMessages_OneofSizer, []interface{}{
+		(*CheckoutMessages_ChangeProductQuantity)(nil),
+		(*CheckoutMessages_Stock)(nil),
+		(*CheckoutMessages_Product)(nil),
+		(*CheckoutMessages_CartOrder)(nil),
 	}
 }
 
-func _CheckoutContext_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*CheckoutContext)
-	// checkoutContextMsg
-	switch x := m.CheckoutContextMsg.(type) {
-	case *CheckoutContext_ChangeProductQuantity:
+func _CheckoutMessages_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*CheckoutMessages)
+	// checkoutMessage
+	switch x := m.CheckoutMessage.(type) {
+	case *CheckoutMessages_ChangeProductQuantity:
 		b.EncodeVarint(1<<3 | proto.WireBytes)
 		if err := b.EncodeMessage(x.ChangeProductQuantity); err != nil {
 			return err
 		}
-	case *CheckoutContext_Stock:
+	case *CheckoutMessages_Stock:
 		b.EncodeVarint(2<<3 | proto.WireBytes)
 		if err := b.EncodeMessage(x.Stock); err != nil {
 			return err
 		}
-	case *CheckoutContext_Product:
+	case *CheckoutMessages_Product:
 		b.EncodeVarint(3<<3 | proto.WireBytes)
 		if err := b.EncodeMessage(x.Product); err != nil {
 			return err
 		}
-	case *CheckoutContext_CartOrder:
+	case *CheckoutMessages_CartOrder:
 		b.EncodeVarint(4<<3 | proto.WireBytes)
 		if err := b.EncodeMessage(x.CartOrder); err != nil {
 			return err
 		}
 	case nil:
 	default:
-		return fmt.Errorf("CheckoutContext.CheckoutContextMsg has unexpected type %T", x)
+		return fmt.Errorf("CheckoutMessages.CheckoutMessage has unexpected type %T", x)
 	}
 	return nil
 }
 
-func _CheckoutContext_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*CheckoutContext)
+func _CheckoutMessages_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*CheckoutMessages)
 	switch tag {
-	case 1: // checkoutContextMsg.changeProductQuantity
+	case 1: // checkoutMessage.changeProductQuantity
 		if wire != proto.WireBytes {
 			return true, proto.ErrInternalBadWireType
 		}
 		msg := new(ChangeProductQuantity)
 		err := b.DecodeMessage(msg)
-		m.CheckoutContextMsg = &CheckoutContext_ChangeProductQuantity{msg}
+		m.CheckoutMessage = &CheckoutMessages_ChangeProductQuantity{msg}
 		return true, err
-	case 2: // checkoutContextMsg.stock
+	case 2: // checkoutMessage.stock
 		if wire != proto.WireBytes {
 			return true, proto.ErrInternalBadWireType
 		}
 		msg := new(Stock)
 		err := b.DecodeMessage(msg)
-		m.CheckoutContextMsg = &CheckoutContext_Stock{msg}
+		m.CheckoutMessage = &CheckoutMessages_Stock{msg}
 		return true, err
-	case 3: // checkoutContextMsg.product
+	case 3: // checkoutMessage.product
 		if wire != proto.WireBytes {
 			return true, proto.ErrInternalBadWireType
 		}
 		msg := new(Product)
 		err := b.DecodeMessage(msg)
-		m.CheckoutContextMsg = &CheckoutContext_Product{msg}
+		m.CheckoutMessage = &CheckoutMessages_Product{msg}
 		return true, err
-	case 4: // checkoutContextMsg.cartOrder
+	case 4: // checkoutMessage.cartOrder
 		if wire != proto.WireBytes {
 			return true, proto.ErrInternalBadWireType
 		}
 		msg := new(OrderCart)
 		err := b.DecodeMessage(msg)
-		m.CheckoutContextMsg = &CheckoutContext_CartOrder{msg}
+		m.CheckoutMessage = &CheckoutMessages_CartOrder{msg}
 		return true, err
 	default:
 		return false, nil
 	}
 }
 
-func _CheckoutContext_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*CheckoutContext)
-	// checkoutContextMsg
-	switch x := m.CheckoutContextMsg.(type) {
-	case *CheckoutContext_ChangeProductQuantity:
+func _CheckoutMessages_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*CheckoutMessages)
+	// checkoutMessage
+	switch x := m.CheckoutMessage.(type) {
+	case *CheckoutMessages_ChangeProductQuantity:
 		s := proto.Size(x.ChangeProductQuantity)
 		n += 1 // tag and wire
 		n += proto.SizeVarint(uint64(s))
 		n += s
-	case *CheckoutContext_Stock:
+	case *CheckoutMessages_Stock:
 		s := proto.Size(x.Stock)
 		n += 1 // tag and wire
 		n += proto.SizeVarint(uint64(s))
 		n += s
-	case *CheckoutContext_Product:
+	case *CheckoutMessages_Product:
 		s := proto.Size(x.Product)
 		n += 1 // tag and wire
 		n += proto.SizeVarint(uint64(s))
 		n += s
-	case *CheckoutContext_CartOrder:
+	case *CheckoutMessages_CartOrder:
 		s := proto.Size(x.CartOrder)
 		n += 1 // tag and wire
 		n += proto.SizeVarint(uint64(s))
@@ -243,7 +243,7 @@ func (m *Product) Reset()         { *m = Product{} }
 func (m *Product) String() string { return proto.CompactTextString(m) }
 func (*Product) ProtoMessage()    {}
 func (*Product) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{1}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{1}
 }
 func (m *Product) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Product.Unmarshal(m, b)
@@ -303,7 +303,7 @@ func (m *Cart) Reset()         { *m = Cart{} }
 func (m *Cart) String() string { return proto.CompactTextString(m) }
 func (*Cart) ProtoMessage()    {}
 func (*Cart) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{2}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{2}
 }
 func (m *Cart) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Cart.Unmarshal(m, b)
@@ -354,7 +354,7 @@ func (m *Position) Reset()         { *m = Position{} }
 func (m *Position) String() string { return proto.CompactTextString(m) }
 func (*Position) ProtoMessage()    {}
 func (*Position) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{3}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{3}
 }
 func (m *Position) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Position.Unmarshal(m, b)
@@ -436,7 +436,7 @@ func (m *ChangeProductQuantity) Reset()         { *m = ChangeProductQuantity{} }
 func (m *ChangeProductQuantity) String() string { return proto.CompactTextString(m) }
 func (*ChangeProductQuantity) ProtoMessage()    {}
 func (*ChangeProductQuantity) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{4}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{4}
 }
 func (m *ChangeProductQuantity) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ChangeProductQuantity.Unmarshal(m, b)
@@ -488,7 +488,7 @@ func (m *OrderCart) Reset()         { *m = OrderCart{} }
 func (m *OrderCart) String() string { return proto.CompactTextString(m) }
 func (*OrderCart) ProtoMessage()    {}
 func (*OrderCart) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{5}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{5}
 }
 func (m *OrderCart) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_OrderCart.Unmarshal(m, b)
@@ -526,7 +526,7 @@ func (m *OrderCartResonse) Reset()         { *m = OrderCartResonse{} }
 func (m *OrderCartResonse) String() string { return proto.CompactTextString(m) }
 func (*OrderCartResonse) ProtoMessage()    {}
 func (*OrderCartResonse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{6}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{6}
 }
 func (m *OrderCartResonse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_OrderCartResonse.Unmarshal(m, b)
@@ -565,7 +565,7 @@ func (m *Stock) Reset()         { *m = Stock{} }
 func (m *Stock) String() string { return proto.CompactTextString(m) }
 func (*Stock) ProtoMessage()    {}
 func (*Stock) Descriptor() ([]byte, []int) {
-	return fileDescriptor_checkout_f71b3428b3a3f15f, []int{7}
+	return fileDescriptor_checkout_6263f28b59a473bf, []int{7}
 }
 func (m *Stock) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Stock.Unmarshal(m, b)
@@ -600,7 +600,7 @@ func (m *Stock) GetQuantity() int64 {
 }
 
 func init() {
-	proto.RegisterType((*CheckoutContext)(nil), "checkout.CheckoutContext")
+	proto.RegisterType((*CheckoutMessages)(nil), "checkout.CheckoutMessages")
 	proto.RegisterType((*Product)(nil), "checkout.Product")
 	proto.RegisterType((*Cart)(nil), "checkout.Cart")
 	proto.RegisterType((*Position)(nil), "checkout.Position")
@@ -610,35 +610,34 @@ func init() {
 	proto.RegisterType((*Stock)(nil), "checkout.Stock")
 }
 
-func init() { proto.RegisterFile("checkout.proto", fileDescriptor_checkout_f71b3428b3a3f15f) }
+func init() { proto.RegisterFile("checkout.proto", fileDescriptor_checkout_6263f28b59a473bf) }
 
-var fileDescriptor_checkout_f71b3428b3a3f15f = []byte{
-	// 417 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x53, 0xdd, 0x8a, 0xd4, 0x30,
-	0x18, 0x9d, 0x76, 0x76, 0x66, 0xda, 0x6f, 0x70, 0x57, 0x3f, 0x77, 0xa5, 0x88, 0x68, 0x89, 0x82,
-	0x73, 0xe3, 0x22, 0xb3, 0x4f, 0xa0, 0xdd, 0x8b, 0x16, 0x14, 0x35, 0x22, 0x5e, 0xd7, 0x34, 0xce,
-	0x86, 0xed, 0x34, 0x35, 0x49, 0xc1, 0x7d, 0x08, 0x5f, 0xce, 0x27, 0x92, 0xa6, 0xe9, 0xcf, 0xc0,
-	0x80, 0xe0, 0x85, 0x97, 0xe7, 0x7c, 0xe7, 0x3b, 0x39, 0xa7, 0x49, 0xe1, 0x94, 0xdd, 0x70, 0x76,
-	0x2b, 0x1b, 0x73, 0x59, 0x2b, 0x69, 0x24, 0x06, 0x3d, 0x26, 0xbf, 0x7c, 0x38, 0x4b, 0x1c, 0x48,
-	0x64, 0x65, 0xf8, 0x4f, 0x83, 0x5f, 0xe1, 0x82, 0xdd, 0xe4, 0xd5, 0x8e, 0x7f, 0x54, 0xb2, 0x68,
-	0x98, 0xf9, 0xd4, 0xe4, 0x95, 0x11, 0xe6, 0x2e, 0xf2, 0x62, 0x6f, 0xb3, 0xde, 0x3e, 0xbb, 0x1c,
-	0xdc, 0x92, 0x63, 0xb2, 0x74, 0x46, 0x8f, 0xef, 0xe3, 0x4b, 0x58, 0x68, 0x23, 0xd9, 0x6d, 0xe4,
-	0x5b, 0xa3, 0xb3, 0xd1, 0xe8, 0x73, 0x4b, 0xa7, 0x33, 0xda, 0xcd, 0xf1, 0x15, 0xac, 0xea, 0x6e,
-	0x37, 0x9a, 0x5b, 0xe9, 0x83, 0x51, 0xea, 0x4c, 0xd3, 0x19, 0xed, 0x35, 0x78, 0x05, 0x21, 0xcb,
-	0x95, 0xf9, 0xa0, 0x0a, 0xae, 0xa2, 0x13, 0xbb, 0xf0, 0x70, 0x5c, 0xb0, 0x74, 0x92, 0xab, 0x76,
-	0x65, 0xd4, 0xbd, 0x3d, 0x07, 0x64, 0x87, 0xc5, 0xdf, 0xeb, 0x1d, 0xb9, 0x83, 0x95, 0x3b, 0x00,
-	0x9f, 0x40, 0xe8, 0x0e, 0xc8, 0xae, 0x6d, 0xf5, 0x90, 0x8e, 0x04, 0x9e, 0xc3, 0xa2, 0x56, 0x82,
-	0x71, 0xdb, 0x65, 0x4e, 0x3b, 0xd0, 0xb2, 0x46, 0x98, 0x92, 0xdb, 0xd8, 0x21, 0xed, 0x00, 0xbe,
-	0x80, 0x7b, 0x7a, 0x9f, 0x97, 0x65, 0xb6, 0xcf, 0x77, 0xfc, 0x0b, 0x7d, 0x67, 0x33, 0x86, 0xf4,
-	0x90, 0x24, 0x29, 0x9c, 0xb4, 0x29, 0xf1, 0x14, 0x7c, 0x51, 0xb8, 0x03, 0x7d, 0x51, 0xe0, 0x6b,
-	0x08, 0x6b, 0xa9, 0x85, 0x11, 0xb2, 0xd2, 0x91, 0x1f, 0xcf, 0x37, 0xeb, 0x2d, 0x4e, 0x3e, 0x87,
-	0x1b, 0xd1, 0x51, 0x44, 0x7e, 0x7b, 0x10, 0xf4, 0xfc, 0xff, 0xae, 0x81, 0x8f, 0x21, 0xf8, 0xd1,
-	0x3f, 0x98, 0xa5, 0x35, 0x1d, 0x30, 0x46, 0xb0, 0x12, 0x95, 0xbd, 0xeb, 0x68, 0x15, 0x7b, 0x9b,
-	0x80, 0xf6, 0x10, 0x63, 0x58, 0xef, 0xa5, 0xe2, 0x99, 0x9b, 0x06, 0x76, 0x3a, 0xa5, 0x88, 0x80,
-	0x8b, 0xa3, 0xcf, 0x0d, 0x1f, 0xc1, 0xb2, 0xbd, 0xd5, 0xec, 0xda, 0xa5, 0x75, 0xe8, 0x2f, 0xc5,
-	0xa7, 0x31, 0xfd, 0xc3, 0x98, 0xe4, 0x39, 0x84, 0xc3, 0xa3, 0x99, 0xd8, 0x7b, 0x53, 0x7b, 0xb2,
-	0x85, 0xfb, 0x83, 0x88, 0x72, 0x2d, 0x2b, 0xcd, 0xf1, 0x29, 0x80, 0x6e, 0x18, 0xe3, 0x5a, 0x7f,
-	0x6f, 0x4a, 0xab, 0x0f, 0xe8, 0x84, 0x21, 0x6f, 0x60, 0xd1, 0xd5, 0xfd, 0xe7, 0x6c, 0xdf, 0x96,
-	0xf6, 0x0f, 0xbe, 0xfa, 0x13, 0x00, 0x00, 0xff, 0xff, 0xf8, 0xe4, 0x22, 0x28, 0xd3, 0x03, 0x00,
-	0x00,
+var fileDescriptor_checkout_6263f28b59a473bf = []byte{
+	// 415 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x53, 0x4d, 0x8f, 0xd3, 0x30,
+	0x14, 0x6c, 0xd2, 0x6d, 0x93, 0xbc, 0x8a, 0xfd, 0x78, 0xb0, 0x28, 0x42, 0x08, 0x22, 0x83, 0x44,
+	0x2f, 0xac, 0x50, 0xf7, 0x17, 0x40, 0xf7, 0x90, 0x48, 0x20, 0xc0, 0x08, 0x71, 0x0e, 0x8e, 0xe9,
+	0x5a, 0x9b, 0xc6, 0xc1, 0x76, 0x0e, 0xfb, 0x1b, 0xf8, 0x77, 0xfc, 0x22, 0x14, 0xc7, 0xf9, 0xa8,
+	0x54, 0x09, 0x89, 0x03, 0xc7, 0x99, 0x37, 0x6f, 0x3a, 0x53, 0xbf, 0xc0, 0x29, 0xbb, 0xe5, 0xec,
+	0x4e, 0x36, 0xe6, 0xaa, 0x56, 0xd2, 0x48, 0x0c, 0x7b, 0x4c, 0x7e, 0xf9, 0x70, 0xbe, 0x75, 0xe0,
+	0x03, 0xd7, 0x3a, 0xdf, 0x71, 0x8d, 0xdf, 0xe0, 0x92, 0xdd, 0xe6, 0xd5, 0x8e, 0x7f, 0x52, 0xb2,
+	0x68, 0x98, 0xf9, 0xdc, 0xe4, 0x95, 0x11, 0xe6, 0x3e, 0xf6, 0x12, 0x6f, 0xbd, 0xda, 0x3c, 0xbf,
+	0x1a, 0xec, 0xb6, 0xc7, 0x64, 0xe9, 0x8c, 0x1e, 0xdf, 0xc7, 0x57, 0xb0, 0xd0, 0x46, 0xb2, 0xbb,
+	0xd8, 0xb7, 0x46, 0x67, 0xa3, 0xd1, 0x97, 0x96, 0x4e, 0x67, 0xb4, 0x9b, 0xe3, 0x6b, 0x08, 0xea,
+	0x6e, 0x37, 0x9e, 0x5b, 0xe9, 0xc5, 0x28, 0x75, 0xa6, 0xe9, 0x8c, 0xf6, 0x1a, 0xbc, 0x86, 0x88,
+	0xe5, 0xca, 0x7c, 0x54, 0x05, 0x57, 0xf1, 0x89, 0x5d, 0x78, 0x38, 0x2e, 0x58, 0x7a, 0x9b, 0xab,
+	0x76, 0x65, 0xd4, 0xbd, 0xbb, 0x80, 0x33, 0x76, 0xd8, 0x9c, 0xdc, 0x43, 0xe0, 0xdc, 0xf1, 0x29,
+	0x44, 0xce, 0x3d, 0xbb, 0xb1, 0xbd, 0x23, 0x3a, 0x12, 0xf8, 0x08, 0x16, 0xb5, 0x12, 0x8c, 0xdb,
+	0x22, 0x73, 0xda, 0x81, 0x96, 0x35, 0xc2, 0x94, 0xdc, 0x66, 0x8e, 0x68, 0x07, 0xf0, 0x25, 0x3c,
+	0xd0, 0xfb, 0xbc, 0x2c, 0xb3, 0x7d, 0xbe, 0xe3, 0x5f, 0xe9, 0x7b, 0x1b, 0x30, 0xa2, 0x87, 0x24,
+	0x49, 0xe1, 0xa4, 0x8d, 0x88, 0xa7, 0xe0, 0x8b, 0xc2, 0xfd, 0xa0, 0x2f, 0x0a, 0x7c, 0x03, 0x51,
+	0x2d, 0xb5, 0x30, 0x42, 0x56, 0x3a, 0xf6, 0x93, 0xf9, 0x7a, 0xb5, 0xc1, 0xc9, 0x7f, 0xe1, 0x46,
+	0x74, 0x14, 0x91, 0xdf, 0x1e, 0x84, 0x3d, 0xff, 0xbf, 0x6b, 0xe0, 0x13, 0x08, 0x7f, 0xf6, 0xd7,
+	0xb2, 0xb4, 0xa6, 0x03, 0xc6, 0x18, 0x02, 0x51, 0xd9, 0x87, 0x8e, 0x83, 0xc4, 0x5b, 0x87, 0xb4,
+	0x87, 0x98, 0xc0, 0x6a, 0x2f, 0x15, 0xcf, 0xdc, 0x34, 0xb4, 0xd3, 0x29, 0x45, 0x04, 0x5c, 0x1e,
+	0xbd, 0x35, 0x7c, 0x0c, 0xcb, 0xf6, 0x49, 0xb3, 0x1b, 0x97, 0xd6, 0xa1, 0xbf, 0x14, 0x9f, 0xc6,
+	0xf4, 0x0f, 0x63, 0x92, 0x17, 0x10, 0x0d, 0x17, 0x33, 0xb1, 0xf7, 0xa6, 0xf6, 0x64, 0x03, 0xe7,
+	0x83, 0x88, 0x72, 0x2d, 0x2b, 0xcd, 0xf1, 0x19, 0x80, 0x6e, 0x18, 0xe3, 0x5a, 0xff, 0x68, 0x4a,
+	0xab, 0x0f, 0xe9, 0x84, 0x21, 0x6f, 0x61, 0xd1, 0xd5, 0xfd, 0xe7, 0x6c, 0xdf, 0x97, 0xf6, 0xfb,
+	0xbd, 0xfe, 0x13, 0x00, 0x00, 0xff, 0xff, 0x1c, 0x28, 0x33, 0xea, 0xd1, 0x03, 0x00, 0x00,
 }

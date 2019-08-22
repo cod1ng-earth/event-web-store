@@ -12,19 +12,6 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-//type cart []cartItem
-//
-//type cartItem struct {
-//	Product     *Product `json:"product"`
-//	Quantity    int64    `json:"quantity"`
-//	MoreInStock bool     `json:"moreInStock"`
-//	InStock     bool     `json:"inStock"`
-//}
-//
-//func (a cart) Len() int           { return len(a) }
-//func (a cart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-//func (a cart) Less(i, j int) bool { return a[i].Product.Title < a[j].Product.Title }
-
 type positions []*Position
 
 func (a positions) Len() int           { return len(a) }

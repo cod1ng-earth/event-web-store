@@ -1,6 +1,7 @@
 
 include ./shared/etc/help.mk
 include ./shared/etc/chaos-network.mk
+include ./shared/etc/codegen.mk
 
 setup: ##@docker Start all conponents and import products
 	$(MAKE) start

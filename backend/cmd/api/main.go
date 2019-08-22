@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/checkout"
 	"github.com/cod1ng-earth/event-web-store/backend/pkg/catalog"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/checkout"
 
 	"github.com/Shopify/sarama"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
