@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package pim;
+
+message PimMessages {
+    oneof pimMessage {
+        Product product = 1;
+    }
+}
+
+message Product {
+    string id = 1;
+    int64 price = 2;
+    string name = 3;
+    string description = 4;
+    string longtext = 5;
+    string category = 6;
+    string smallImageURL = 7;
+    string largeImageURL = 8;
+    bool disabled = 9;
+}

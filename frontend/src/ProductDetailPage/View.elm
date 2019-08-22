@@ -20,7 +20,7 @@ view model =
 
         Loaded product ->
             div [ class "mdl-grid" ]
-                [ div [ class "mdl-cell mdl-cell--12-col" ] [ h1 [] [ text product.title ] ]
+                [ div [ class "mdl-cell mdl-cell--12-col" ] [ h1 [] [ text product.name ] ]
                 , div [ class "mdl-cell mdl-cell--8-col" ] [ img [ class "custom-detail-image", src (productImage product.id 400 200) ] [] ]
                 , div [ class "mdl-cell mdl-cell--4-col" ]
                     [ span [ class "custom-detail-block" ] [ text ("id: " ++ product.id) ]

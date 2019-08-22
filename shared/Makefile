@@ -1,6 +1,6 @@
 
 include ./etc/help.mk
-include ./etc/chaos-network.mk
+include ./etc/e2e-tests.mk
 
 start: ##@docker Start kafka and zookeeper in the background
 	docker-compose up --detach --build

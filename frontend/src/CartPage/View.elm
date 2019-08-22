@@ -66,7 +66,7 @@ renderCartItem item =
             [ span [ class "mdl-list__item-primary-content" ]
                 [ img [ class "custom-list-image", src (productImage item.productID 100 50) ] []
 
-                --          , span [ onClick (LoadProduct item.productID) ] [ text item.title ]
+                --          , span [ onClick (LoadProduct item.productID) ] [ text item.name ]
                 , span [ class "mdl-list__item-sub-title" ] [ text ("price: " ++ formatPrice item.price) ]
                 ]
             , span []

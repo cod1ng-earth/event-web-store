@@ -143,7 +143,7 @@ func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *catalog.Pro
 				Price:         msg.Price,
 				ProductID:     msg.Id,
 				SmallImageURL: msg.SmallImageURL,
-				Title:         msg.Title,
+				Name:          msg.Name,
 			},
 		},
 	}

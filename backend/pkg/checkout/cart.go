@@ -15,7 +15,7 @@ type positions []*Position
 
 func (a positions) Len() int           { return len(a) }
 func (a positions) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a positions) Less(i, j int) bool { return a[i].Title < a[j].Title }
+func (a positions) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 func (c *context) NewCartHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +59,7 @@ func (c *context) NewCartHandler() http.HandlerFunc {
 				pp = append(pp, &Position{
 					ProductID:     uuid,
 					Price:         m.products[uuid].Price,
-					Title:         m.products[uuid].Title,
+					Name:          m.products[uuid].Name,
 					SmallImageURL: m.products[uuid].SmallImageURL,
 
 					Quantity:    count,

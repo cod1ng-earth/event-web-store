@@ -1,13 +1,10 @@
-// Command click is a chromedp example demonstrating how to use a selector to
-// click on an element.
 package main
-
-// https://github.com/chromedp/chromedp/issues/82#issuecomment-312022893
 
 import (
 	"context"
 	"io/ioutil"
 	"log"
+	"os"
 	"time"
 
 	"github.com/chromedp/cdproto/emulation"
@@ -18,10 +15,7 @@ func main() {
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		func(a *chromedp.ExecAllocator) {
-			chromedp.Flag("headless", false)(a)
-			// Like in Puppeteer.
-			chromedp.Flag("hide-scrollbars", false)(a)
-			chromedp.Flag("mute-audio", false)(a)
+			chromedp.Flag("headless", os.Getenv("SHOW_CHROME") == "")(a)
 		})
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -75,22 +69,6 @@ func main() {
 	log.Printf("test took %v", time.Since(start))
 	log.Printf("price: %v", price)
 }
-
-/*
-func runActions(ctx context.Context d time.Duration, actions ...chromedp.Action) error {
-	//ctx, cancel = context.WithTimeout(ctx, d)
-	//defer cancel()
-
-	width, height := 1024, 768
-	actions = prepend(emulation.SetDeviceMetricsOverride(int64(width), int64(height), 1.0, false), actions)
-
-	return chromedp.Run(ctx, actions...)
-}
-
-func prepend(e chromedp.Action, ls []chromedp.Action) []chromedp.Action {
-	return append([]chromedp.Action{e}, ls...)
-}
-*/
 
 func screenshotSave(fileName string, buf *[]byte) chromedp.ActionFunc {
 	return func(ctx context.Context) error {

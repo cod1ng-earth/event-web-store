@@ -54,7 +54,7 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 		for _, p := range pp {
 			products = append(products, &Product{
 				Id:    p.Id,
-				Title: p.Title,
+				Name:  p.Name,
 				Price: p.Price,
 			})
 		}
@@ -76,10 +76,10 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 
 func loadProducts(sorting string, prefix string, m *model) ([]*Product, error) {
 	if prefix != "" {
-		pp := m.sortedByTitle
-		startIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Title >= prefix })
+		pp := m.sortedByName
+		startIdx := sort.Search(len(pp), func(i int) bool { return pp[i].Name >= prefix })
 		pp = pp[startIdx:]
-		endIdx := sort.Search(len(pp), func(i int) bool { return !strings.HasPrefix(pp[i].Title, prefix) })
+		endIdx := sort.Search(len(pp), func(i int) bool { return !strings.HasPrefix(pp[i].Name, prefix) })
 		pp = pp[:endIdx]
 
 		switch sorting {
@@ -104,7 +104,7 @@ func loadProducts(sorting string, prefix string, m *model) ([]*Product, error) {
 	case "price":
 		return m.sortedByPrice, nil
 	case "name":
-		return m.sortedByTitle, nil
+		return m.sortedByName, nil
 	}
 
 	return []*Product{}, fmt.Errorf("sorting %s unknown", sorting)

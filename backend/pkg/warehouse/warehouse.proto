@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package warehouse;
+
+message WarehouseMessages {
+    oneof warehouseMessage {
+        StockCorrected stockCorrected = 1;
+    }
+}
+
+message StockCorrected {
+    string productID = 1;
+    int64 quantity = 2;
+}

@@ -63,7 +63,7 @@ type alias CheckoutMessages =
 type alias Product =
     { productID : String
     , price : Int
-    , title : String
+    , name : String
     , smallImageURL : String
     }
 
@@ -81,7 +81,7 @@ type alias Cart =
 type alias Position =
     { productID : String
     , price : Int
-    , title : String
+    , name : String
     , smallImageURL : String
     , quantity : Int
     , inStock : Bool
@@ -146,7 +146,7 @@ productDecoder =
     Decode.message (Product "" 0 "" "")
         [ Decode.optional 1 Decode.string setProductID
         , Decode.optional 2 Decode.int32 setPrice
-        , Decode.optional 3 Decode.string setTitle
+        , Decode.optional 3 Decode.string setName
         , Decode.optional 4 Decode.string setSmallImageURL
         ]
 
@@ -168,7 +168,7 @@ positionDecoder =
     Decode.message (Position "" 0 "" "" 0 False False)
         [ Decode.optional 1 Decode.string setProductID
         , Decode.optional 2 Decode.int32 setPrice
-        , Decode.optional 3 Decode.string setTitle
+        , Decode.optional 3 Decode.string setName
         , Decode.optional 4 Decode.string setSmallImageURL
         , Decode.optional 6 Decode.int32 setQuantity
         , Decode.optional 7 Decode.bool setInStock
@@ -251,7 +251,7 @@ toProductEncoder model =
     Encode.message
         [ ( 1, Encode.string model.productID )
         , ( 2, Encode.int32 model.price )
-        , ( 3, Encode.string model.title )
+        , ( 3, Encode.string model.name )
         , ( 4, Encode.string model.smallImageURL )
         ]
 
@@ -273,7 +273,7 @@ toPositionEncoder model =
     Encode.message
         [ ( 1, Encode.string model.productID )
         , ( 2, Encode.int32 model.price )
-        , ( 3, Encode.string model.title )
+        , ( 3, Encode.string model.name )
         , ( 4, Encode.string model.smallImageURL )
         , ( 6, Encode.int32 model.quantity )
         , ( 7, Encode.bool model.inStock )
@@ -339,9 +339,9 @@ setPrice value model =
     { model | price = value }
 
 
-setTitle : a -> { b | title : a } -> { b | title : a }
-setTitle value model =
-    { model | title = value }
+setName : a -> { b | name : a } -> { b | name : a }
+setName value model =
+    { model | name = value }
 
 
 setSmallImageURL : a -> { b | smallImageURL : a } -> { b | smallImageURL : a }

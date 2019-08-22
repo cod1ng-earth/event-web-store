@@ -74,7 +74,7 @@ type alias CatalogPage =
 type alias Product =
     { id : String
     , price : Int
-    , title : String
+    , name : String
     , description : String
     , longtext : String
     , category : String
@@ -123,7 +123,7 @@ productDecoder =
     Decode.message (Product "" 0 "" "" "" "" "" "" False)
         [ Decode.optional 1 Decode.string setId
         , Decode.optional 2 Decode.int32 setPrice
-        , Decode.optional 3 Decode.string setTitle
+        , Decode.optional 3 Decode.string setName
         , Decode.optional 4 Decode.string setDescription
         , Decode.optional 5 Decode.string setLongtext
         , Decode.optional 6 Decode.string setCategory
@@ -176,7 +176,7 @@ toProductEncoder model =
     Encode.message
         [ ( 1, Encode.string model.id )
         , ( 2, Encode.int32 model.price )
-        , ( 3, Encode.string model.title )
+        , ( 3, Encode.string model.name )
         , ( 4, Encode.string model.description )
         , ( 5, Encode.string model.longtext )
         , ( 6, Encode.string model.category )
@@ -245,9 +245,9 @@ setPrice value model =
     { model | price = value }
 
 
-setTitle : a -> { b | title : a } -> { b | title : a }
-setTitle value model =
-    { model | title = value }
+setName : a -> { b | name : a } -> { b | name : a }
+setName value model =
+    { model | name = value }
 
 
 setDescription : a -> { b | description : a } -> { b | description : a }

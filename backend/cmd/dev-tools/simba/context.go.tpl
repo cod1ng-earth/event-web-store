@@ -318,7 +318,6 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
-	return nil
 }
 {{ end }}
 
@@ -342,7 +341,6 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
-	return nil
 }
 
 {{ range .MessageNames }}

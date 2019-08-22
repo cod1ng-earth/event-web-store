@@ -9,7 +9,7 @@ type model struct {
 
 	sortedByUUID  productsByUUID
 	sortedByPrice productsByPrice
-	sortedByTitle productsByTitle
+	sortedByName  productsByName
 }
 
 func newModel() *model {
@@ -30,11 +30,11 @@ func (pp productsByPrice) Len() int           { return len(pp) }
 func (pp productsByPrice) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
 func (pp productsByPrice) Less(i, j int) bool { return pp[i].Price < pp[j].Price }
 
-type productsByTitle []*Product
+type productsByName []*Product
 
-func (pp productsByTitle) Len() int           { return len(pp) }
-func (pp productsByTitle) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
-func (pp productsByTitle) Less(i, j int) bool { return pp[i].Title < pp[j].Title }
+func (pp productsByName) Len() int           { return len(pp) }
+func (pp productsByName) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
+func (pp productsByName) Less(i, j int) bool { return pp[i].Name < pp[j].Name }
 
 func updateModelProduct(m *model, offset int64, new *Product) error {
 	old, oldFound := m.products[new.Id]
@@ -56,11 +56,11 @@ func updateModelProduct(m *model, offset int64, new *Product) error {
 		}
 		m.sortedByPrice = remove(m.sortedByPrice, idx)
 
-		idx = sort.Search(len(m.sortedByTitle), func(i int) bool { return m.sortedByTitle[i].Title >= old.Title })
-		for m.sortedByTitle[idx].Id != old.Id {
+		idx = sort.Search(len(m.sortedByName), func(i int) bool { return m.sortedByName[i].Name >= old.Name })
+		for m.sortedByName[idx].Id != old.Id {
 			idx++
 		}
-		m.sortedByTitle = remove(m.sortedByTitle, idx)
+		m.sortedByName = remove(m.sortedByName, idx)
 
 		return nil
 	}
@@ -81,18 +81,18 @@ func updateModelProduct(m *model, offset int64, new *Product) error {
 		}
 		m.sortedByPrice = remove(m.sortedByPrice, idx)
 
-		idx = sort.Search(len(m.sortedByTitle), func(i int) bool { return m.sortedByTitle[i].Title >= old.Title })
-		for m.sortedByTitle[idx].Id != old.Id {
+		idx = sort.Search(len(m.sortedByName), func(i int) bool { return m.sortedByName[i].Name >= old.Name })
+		for m.sortedByName[idx].Id != old.Id {
 			idx++
 		}
-		m.sortedByTitle = remove(m.sortedByTitle, idx)
+		m.sortedByName = remove(m.sortedByName, idx)
 	}
 
 	idx = sort.Search(len(m.sortedByPrice), func(i int) bool { return m.sortedByPrice[i].Price >= new.Price })
 	m.sortedByPrice = insert(m.sortedByPrice, idx, new)
 
-	idx = sort.Search(len(m.sortedByTitle), func(i int) bool { return m.sortedByTitle[i].Title >= new.Title })
-	m.sortedByTitle = insert(m.sortedByTitle, idx, new)
+	idx = sort.Search(len(m.sortedByName), func(i int) bool { return m.sortedByName[i].Name >= new.Name })
+	m.sortedByName = insert(m.sortedByName, idx, new)
 
 	return nil
 }
@@ -117,16 +117,16 @@ func batchUpdateModelProduct(m *model, offset int64, new *Product) error {
 func batchFinalizeModel(m *model) error {
 	m.sortedByUUID = nil
 	m.sortedByPrice = nil
-	m.sortedByTitle = nil
+	m.sortedByName = nil
 
 	for _, v := range m.products {
 		m.sortedByUUID = append(m.sortedByUUID, v)
 		m.sortedByPrice = append(m.sortedByPrice, v)
-		m.sortedByTitle = append(m.sortedByTitle, v)
+		m.sortedByName = append(m.sortedByName, v)
 	}
 	sort.Sort(m.sortedByUUID)
 	sort.Sort(m.sortedByPrice)
-	sort.Sort(m.sortedByTitle)
+	sort.Sort(m.sortedByName)
 
 	return nil
 }
