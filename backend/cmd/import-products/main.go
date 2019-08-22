@@ -137,8 +137,8 @@ func remove(prevProducts map[string][]string, ch chan<- *sarama.ProducerMessage)
 
 func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *catalog.Product) error {
 
-	change := &checkout.CheckoutContext{
-		CheckoutContextMsg: &checkout.CheckoutContext_Product{
+	change1 := &checkout.CheckoutMessages{
+		CheckoutMessage: &checkout.CheckoutMessages_Product{
 			Product: &checkout.Product{
 				Price:         msg.Price,
 				ProductID:     msg.Id,
@@ -147,7 +147,7 @@ func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *catalog.Pro
 			},
 		},
 	}
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(change1)
 	if err != nil {
 		return fmt.Errorf("failed to serialize product massage for checkout topic: %s", err)
 	}
@@ -157,7 +157,12 @@ func sendUpdate(ch chan<- *sarama.ProducerMessage, UUID string, msg *catalog.Pro
 		Value: sarama.ByteEncoder(bytes),
 	}
 
-	bytes, err = proto.Marshal(msg)
+	change2 := &catalog.CatalogMessages{
+		CatalogMessage: &catalog.CatalogMessages_Product{
+			Product: msg,
+		},
+	}
+	bytes, err = proto.Marshal(change2)
 	if err != nil {
 		return fmt.Errorf("failed to serialize product massage: %s", err)
 	}

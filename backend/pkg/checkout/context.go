@@ -1,12 +1,12 @@
 package checkout
 
 import (
+	"fmt"
 	"log"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/golang/protobuf/proto"
 )
 
 const (
@@ -18,15 +18,14 @@ type context struct {
 	doneCh    chan struct{}
 	client    sarama.Client
 	consumer  sarama.Consumer
+	producer  sarama.SyncProducer
 	partition sarama.PartitionConsumer
 
 	batchOffset int64
 
-
 	model  *model
-	lock   sync.RWMutex
+	lock   *sync.RWMutex
 	writes chan *sarama.ConsumerMessage
-
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -41,6 +40,10 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
+	}
+	producer, err := sarama.NewSyncProducerFromClient(client)
+	if err != nil {
+		log.Panicf("failed to setup kafka producer: %s", err)
 	}
 	partition, err := consumer.ConsumePartition(Topic, 0, 0)
 	if err != nil {
@@ -57,15 +60,14 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 		doneCh:    make(chan struct{}, 1),
 		client:    client,
 		consumer:  consumer,
+		producer:  producer,
 		partition: partition,
 
 		batchOffset: batchOffset,
 
-	
 		model:  newModel(),
 		lock:   &sync.RWMutex{},
 		writes: make(chan *sarama.ConsumerMessage, 32768),
-	
 
 		offset:        0,
 		offsetChanged: sync.NewCond(&sync.Mutex{}),
@@ -75,6 +77,17 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 
 func (c *context) Stop() {
 	c.doneCh <- struct{}{}
+}
+
+func (c *context) await(offset int64) {
+	if c.offset >= offset {
+		return
+	}
+	c.offsetChanged.L.Lock()
+	for c.offset < offset {
+		c.offsetChanged.Wait()
+	}
+	c.offsetChanged.L.Unlock()
 }
 
 func (c *context) AwaitLastOffset() {
@@ -87,33 +100,27 @@ func (c *context) AwaitLastOffset() {
 
 func (c *context) updateLoop() {
 
-	var offset int64
-	var start time.Time
-
 	for {
-	
-		applyChange(msg, c.model, c)
-	
-	}
 
+		for msg := range c.writes {
+			applyChange(msg, c.model, c)
+		}
+
+	}
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
+	//	log.Printf("applying message with offset %v", msg.Offset)
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	defer func() {
+		c.offset = msg.Offset
+		c.offsetChanged.Broadcast()
+	}()
 
-
-
-	if msg.Offset < c.batchOffset {
-		batchUpdateModel(msg, m)
-	} else if msg.Offset == c.batchOffset {
-		batchUpdateModel(msg, m)
-		batchFinalizeModel(m)
-	} else {
-		updateModel(msg, m)
-	}
+	updateModel(msg, m)
 
 }
 
@@ -129,6 +136,7 @@ func (c *context) Start() {
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-c.partition.Messages():
+			//			log.Printf("recieved message with offset %v", msg.Offset)
 			c.writes <- msg
 
 		case <-c.doneCh:
@@ -140,6 +148,9 @@ func (c *context) Start() {
 			if err := c.consumer.Close(); err != nil {
 				log.Panicf("failed to close kafka consumer: %s", err)
 			}
+			if err := c.producer.Close(); err != nil {
+				log.Panicf("failed to close kafka producer: %s", err)
+			}
 			if err := c.client.Close(); err != nil {
 				log.Panicf("failed to close kafka client: %s", err)
 			}
@@ -150,49 +161,37 @@ func (c *context) Start() {
 
 func (c *context) read() (*model, func()) {
 
-	if msg.Offset < c.batchOffset {
-		c.AwaitLastOffset()
+	c.offsetChanged.L.Lock()
+	for c.offset < c.batchOffset {
+		c.offsetChanged.Wait()
 	}
-
+	c.offsetChanged.L.Unlock()
 
 	c.lock.RLock()
-	return model, c.lock.Unlock
+	return c.model, c.lock.RUnlock
 
 }
 
-
-func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
+func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	cc := CheckoutMessages{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	defer func() { offset = msg.Offset }()
-
 	switch x := cc.GetCheckoutMessage().(type) {
 
-	
 	case *CheckoutMessages_ChangeProductQuantity:
-		if err := batchUpdateModelChangeProductQuantity(cc.GetChangeProductQuantity(), offset); err != nil {
-			return err
-		}
-	
+		return updateModelChangeProductQuantity(model, msg.Offset, cc.GetChangeProductQuantity())
+
 	case *CheckoutMessages_Stock:
-		if err := batchUpdateModelStock(cc.GetStock(), offset); err != nil {
-			return err
-		}
-	
+		return updateModelStock(model, msg.Offset, cc.GetStock())
+
 	case *CheckoutMessages_Product:
-		if err := batchUpdateModelProduct(cc.GetProduct(), offset); err != nil {
-			return err
-		}
-	
-	case *CheckoutMessages_CartOrder:
-		if err := batchUpdateModelCartOrder(cc.GetCartOrder(), offset); err != nil {
-			return err
-		}
-	
+		return updateModelProduct(model, msg.Offset, cc.GetProduct())
+
+	case *CheckoutMessages_OrderCart:
+		return updateModelOrderCart(model, msg.Offset, cc.GetOrderCart())
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -203,45 +202,82 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	return nil
 }
 
+func (c *context) logChangeProductQuantity(logMsg *ChangeProductQuantity) (int32, int64, error) {
 
-func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := CheckoutMessages{}
-	err := proto.Unmarshal(msg.Value, &cc)
+	change := &CheckoutMessages{
+		CheckoutMessage: &CheckoutMessages_ChangeProductQuantity{
+			ChangeProductQuantity: logMsg,
+		},
+	}
+
+	bytes, err := proto.Marshal(change)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
 	}
 
-	defer func() { offset = msg.Offset }()
-
-	switch x := cc.GetCheckoutMessage().(type) {
-
-	
-	case *CheckoutMessages_ChangeProductQuantity:
-		if err := updateModelChangeProductQuantity(cc.GetChangeProductQuantity(), offset); err != nil {
-			return err
-		}
-	
-	case *CheckoutMessages_Stock:
-		if err := updateModelStock(cc.GetStock(), offset); err != nil {
-			return err
-		}
-	
-	case *CheckoutMessages_Product:
-		if err := updateModelProduct(cc.GetProduct(), offset); err != nil {
-			return err
-		}
-	
-	case *CheckoutMessages_CartOrder:
-		if err := updateModelCartOrder(cc.GetCartOrder(), offset); err != nil {
-			return err
-		}
-	
-
-	case nil:
-		panic(fmt.Sprintf("checkout context message is empty"))
-
-	default:
-		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	msg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
 	}
-	return nil
+	return c.producer.SendMessage(msg)
+}
+
+func (c *context) logStock(logMsg *Stock) (int32, int64, error) {
+
+	change := &CheckoutMessages{
+		CheckoutMessage: &CheckoutMessages_Stock{
+			Stock: logMsg,
+		},
+	}
+
+	bytes, err := proto.Marshal(change)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+	}
+
+	msg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(msg)
+}
+
+func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
+
+	change := &CheckoutMessages{
+		CheckoutMessage: &CheckoutMessages_Product{
+			Product: logMsg,
+		},
+	}
+
+	bytes, err := proto.Marshal(change)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+	}
+
+	msg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(msg)
+}
+
+func (c *context) logOrderCart(logMsg *OrderCart) (int32, int64, error) {
+
+	change := &CheckoutMessages{
+		CheckoutMessage: &CheckoutMessages_OrderCart{
+			OrderCart: logMsg,
+		},
+	}
+
+	bytes, err := proto.Marshal(change)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+	}
+
+	msg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(msg)
 }

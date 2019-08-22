@@ -9,7 +9,7 @@ message CheckoutMessages {
         ChangeProductQuantity changeProductQuantity = 1;
         Stock stock = 2;
         Product product = 3;
-        OrderCart cartOrder = 4;
+        OrderCart orderCart = 4;
     }
 }
 

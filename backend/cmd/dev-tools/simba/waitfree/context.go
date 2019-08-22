@@ -1,11 +1,15 @@
 package {{ .Name }}
 
 import (
+	"fmt"
 	"log"
 	"sync"
+{{ if eq .Lock "wait-free" }}
 	"sync/atomic"
 	"time"
+{{ end }}
 
+	"github.com/golang/protobuf/proto"
 	"github.com/Shopify/sarama"
 )
 
@@ -18,17 +22,18 @@ type context struct {
 	doneCh    chan struct{}
 	client    sarama.Client
 	consumer  sarama.Consumer
+	producer  sarama.SyncProducer
 	partition sarama.PartitionConsumer
 
 	batchOffset int64
 
 {{ if eq .Lock "exclusive" }}
 	model  *model
-	lock   sync.Mutex
+	lock   *sync.Mutex
 	writes chan *sarama.ConsumerMessage
 {{ else if eq .Lock "parallel" }}
 	model  *model
-	lock   sync.RWMutex
+	lock   *sync.RWMutex
 	writes chan *sarama.ConsumerMessage
 {{ else if eq .Lock "wait-free" }}
 	readerAChanged *sync.Cond
@@ -57,6 +62,10 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
+	producer, err := sarama.NewSyncProducerFromClient(client)
+	if err != nil {
+		log.Panicf("failed to setup kafka producer: %s", err)
+	}
 	partition, err := consumer.ConsumePartition(Topic, 0, 0)
 	if err != nil {
 		log.Panicf("failed to setup kafka partition: %s", err)
@@ -72,6 +81,7 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 		doneCh:    make(chan struct{}, 1),
 		client:    client,
 		consumer:  consumer,
+		producer:  producer,
 		partition: partition,
 
 		batchOffset: batchOffset,
@@ -107,6 +117,17 @@ func (c *context) Stop() {
 	c.doneCh <- struct{}{}
 }
 
+func (c *context) await(offset int64) {
+	if c.offset >= offset {
+		return
+	}
+	c.offsetChanged.L.Lock()
+	for c.offset < offset {
+		c.offsetChanged.Wait()
+	}
+	c.offsetChanged.L.Unlock()
+}
+
 func (c *context) AwaitLastOffset() {
 	c.offsetChanged.L.Lock()
 	for c.offset < c.batchOffset {
@@ -117,14 +138,11 @@ func (c *context) AwaitLastOffset() {
 
 func (c *context) updateLoop() {
 
-	var offset int64
-	var start time.Time
-
 	for {
-	{{ if eq .Lock "exclusive" }}
-		applyChange(msg, c.model, c)
-	{{ else if eq .Lock "parallel" }}
-		applyChange(msg, c.model, c)
+	{{ if or (eq .Lock "exclusive") (eq .Lock "parallel") }}
+		for msg := range c.writes {
+			applyChange(msg, c.model, c)
+		}
 	{{ else if eq .Lock "wait-free" }}
 		writeDelay := 0 * time.Second
 
@@ -155,9 +173,9 @@ func (c *context) updateLoop() {
 			return
 		}
 		c.writesRedo <- msg
-		start = time.Now()
+		start := time.Now()
 		applyChange(msg, model, c)
-		offset = msg.Offset
+		offset := msg.Offset
 		writeDelay += time.Since(start)
 
 		for writeDelay < 10*time.Millisecond && len(c.writes) > 0 && len(c.writesRedo) < 32768 {
@@ -177,17 +195,19 @@ func (c *context) updateLoop() {
 		c.offsetChanged.Broadcast()
 	{{ end }}
 	}
-
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
-{{ if eq .Lock "exclusive" }}
+//	log.Printf("applying message with offset %v", msg.Offset)
+
+{{ if or (eq .Lock "exclusive") (eq .Lock "parallel") }}
 	c.lock.Lock()
 	defer c.lock.Unlock()
-{{ else if eq .Lock "parallel" }}
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	defer func() {
+		c.offset = msg.Offset
+		c.offsetChanged.Broadcast()
+	}()
 {{ end }}
 
 {{ if .Batch }}
@@ -216,6 +236,7 @@ func (c *context) Start() {
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-c.partition.Messages():
+//			log.Printf("recieved message with offset %v", msg.Offset)
 			c.writes <- msg
 
 		case <-c.doneCh:
@@ -227,6 +248,9 @@ func (c *context) Start() {
 			if err := c.consumer.Close(); err != nil {
 				log.Panicf("failed to close kafka consumer: %s", err)
 			}
+			if err := c.producer.Close(); err != nil {
+				log.Panicf("failed to close kafka producer: %s", err)
+			}
 			if err := c.client.Close(); err != nil {
 				log.Panicf("failed to close kafka client: %s", err)
 			}
@@ -237,16 +261,18 @@ func (c *context) Start() {
 
 func (c *context) read() (*model, func()) {
 
-	if msg.Offset < c.batchOffset {
-		c.AwaitLastOffset()
+	c.offsetChanged.L.Lock()
+	for c.offset < c.batchOffset {
+		c.offsetChanged.Wait()
 	}
+	c.offsetChanged.L.Unlock()
 
 {{ if eq .Lock "exclusive" }}
 	c.lock.Lock()
-	return model, c.lock.Unlock
+	return c.model, c.lock.Unlock
 {{ else if eq .Lock "parallel" }}
 	c.lock.RLock()
-	return model, c.lock.Unlock
+	return c.model, c.lock.RUnlock
 {{ else if eq .Lock "wait-free" }}
 	atomic.AddInt32(&c.readersA, 1)
 	atomic.AddInt32(&c.readersB, 1)
@@ -277,15 +303,11 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	defer func() { offset = msg.Offset }()
-
 	switch x := cc.Get{{ .Name | title }}Message().(type) {
 
 	{{ range .MessageNames }}
 	case *{{ $.Name | title }}Messages_{{ . | title }}:
-		if err := batchUpdateModel{{ . | title }}(cc.Get{{ . | title }}(), offset); err != nil {
-			return err
-		}
+		return batchUpdateModel{{ . | title }}(model, msg.Offset, cc.Get{{ . | title }}())
 	{{ end }}
 
 	case nil:
@@ -299,28 +321,46 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 {{ end }}
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := CheckoutMessages{}
+	cc := {{ .Name | title }}Messages{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	defer func() { offset = msg.Offset }()
-
 	switch x := cc.Get{{ .Name | title }}Message().(type) {
 
 	{{ range .MessageNames }}
 	case *{{ $.Name | title }}Messages_{{ . | title }}:
-		if err := updateModel{{ . | title }}(cc.Get{{ . | title }}(), offset); err != nil {
-			return err
-		}
+		return updateModel{{ . | title }}(model, msg.Offset, cc.Get{{ . | title }}())
 	{{ end }}
 
 	case nil:
-		panic(fmt.Sprintf("checkout context message is empty"))
+		panic(fmt.Sprintf("context message is empty"))
 
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
 	return nil
 }
+
+{{ range .MessageNames }}
+func (c *context) log{{ . | title }}(logMsg *{{ . | title }}) (int32, int64, error) {
+
+	change := &{{ $.Name | title }}Messages{
+		{{ $.Name | title }}Message: &{{ $.Name | title }}Messages_{{ . | title }}{
+			{{ . | title }}: logMsg,
+		},
+	}
+
+	bytes, err := proto.Marshal(change)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+	}
+
+	msg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(msg)
+}
+{{ end }}

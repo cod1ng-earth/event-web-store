@@ -29,17 +29,19 @@ func main() {
 	config.Producer.Flush.MaxMessages = 500
 	config.Producer.Return.Successes = true
 
-	prd := catalog.NewContext(brokerList, config)
-	go prd.Start()
-	defer prd.Stop()
-	prd.AwaitLastOffset()
-	http.HandleFunc("/product", prd.NewPDPHandler())
-	http.HandleFunc("/products", prd.NewCatalogHandler())
+	cat := catalog.NewContext(brokerList, config)
+	go cat.Start()
+	defer cat.Stop()
+	cat.AwaitLastOffset()
+	http.HandleFunc("/product", cat.NewPDPHandler())
+	http.HandleFunc("/products", cat.NewCatalogHandler())
 
-	shutdown := checkout.StartContext(brokerList, config)
-	defer shutdown()
-	http.HandleFunc("/cart", checkout.CartHandler)
-	http.HandleFunc("/orderCart", checkout.OrderHandler)
+	ckt := checkout.NewContext(brokerList, config)
+	go ckt.Start()
+	defer ckt.Stop()
+	ckt.AwaitLastOffset()
+	http.HandleFunc("/cart", ckt.NewCartHandler())
+	http.HandleFunc("/orderCart", ckt.NewOrderHandler())
 
 	http.Handle("/metrics", promhttp.Handler())
 

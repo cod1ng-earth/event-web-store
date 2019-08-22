@@ -2,13 +2,10 @@ package catalog
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/golang/protobuf/proto"
 )
 
 func (c *context) NewCatalogHandler() http.HandlerFunc {
@@ -73,18 +70,7 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 			ItemsPerPage: itemsPerPage,
 		}
 
-		//		respondJson(w, payload)
-		w.Header().Set("Content-Type", "application/protobuf")
-
-		bytes, err := proto.Marshal(payload)
-		if err != nil {
-			log.Printf("failed to serialize: %v", err)
-		}
-
-		_, err = w.Write(bytes)
-		if err != nil {
-			log.Printf("failed to send result: %v", err)
-		}
+		respond(w, payload)
 	}
 }
 

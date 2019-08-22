@@ -48,7 +48,7 @@ type CheckoutMessage
     = CheckoutMessageChangeProductQuantity ChangeProductQuantity
     | CheckoutMessageStock Stock
     | CheckoutMessageProduct Product
-    | CheckoutMessageCartOrder OrderCart
+    | CheckoutMessageOrderCart OrderCart
 
 
 {-| `CheckoutMessages` message
@@ -133,7 +133,7 @@ checkoutMessagesDecoder =
             [ ( 1, Decode.map CheckoutMessageChangeProductQuantity changeProductQuantityDecoder )
             , ( 2, Decode.map CheckoutMessageStock stockDecoder )
             , ( 3, Decode.map CheckoutMessageProduct productDecoder )
-            , ( 4, Decode.map CheckoutMessageCartOrder orderCartDecoder )
+            , ( 4, Decode.map CheckoutMessageOrderCart orderCartDecoder )
             ]
             setCheckoutMessage
         ]
@@ -231,7 +231,7 @@ toCheckoutMessageEncoder model =
         CheckoutMessageProduct value ->
             ( 3, toProductEncoder value )
 
-        CheckoutMessageCartOrder value ->
+        CheckoutMessageOrderCart value ->
             ( 4, toOrderCartEncoder value )
 
 

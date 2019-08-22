@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -18,82 +17,84 @@ func (a positions) Len() int           { return len(a) }
 func (a positions) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a positions) Less(i, j int) bool { return a[i].Title < a[j].Title }
 
-func CartHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Set-Cookie, *")
-	w.Header().Set("Content-Type", "application/json")
+func (c *context) NewCartHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Set-Cookie, *")
+		w.Header().Set("Content-Type", "application/json")
 
-	if r.Method == "OPTIONS" {
-		return
-	}
-
-	cookie, err := r.Cookie("cart")
-	if err != nil {
-		expiration := time.Now().Add(365 * 24 * time.Hour)
-		cookie = &http.Cookie{
-			Name:    "cart",
-			Value:   randomString(32),
-			Expires: expiration,
-		}
-		http.SetCookie(w, cookie)
-	}
-
-	cartID := cookie.Value
-
-	if r.Method == "POST" {
-		err := addToCart(w, r, cartID)
-		if err != nil {
-			log.Printf("failed to add a product to the cart: %v", err)
+		if r.Method == "OPTIONS" {
 			return
 		}
-	}
 
-	mut.RLock()
-	defer mut.RUnlock()
-
-	pp := positions{}
-	for uuid, count := range carts[cartID] {
-		if _, ok := products[uuid]; ok {
-			pp = append(pp, &Position{
-				ProductID:     uuid,
-				Price:         products[uuid].Price,
-				Title:         products[uuid].Title,
-				SmallImageURL: products[uuid].SmallImageURL,
-
-				Quantity:    count,
-				MoreInStock: stock[uuid] > count,
-				InStock:     stock[uuid] >= count,
-			})
+		cookie, err := r.Cookie("cart")
+		if err != nil {
+			expiration := time.Now().Add(365 * 24 * time.Hour)
+			cookie = &http.Cookie{
+				Name:    "cart",
+				Value:   randomString(32),
+				Expires: expiration,
+			}
+			http.SetCookie(w, cookie)
 		}
-	}
-	sort.Sort(pp)
 
-	cart := &Cart{
-		Positions: pp,
-	}
+		cartID := cookie.Value
 
-	bytes, err := proto.Marshal(cart)
-	if err != nil {
-		log.Printf("failed to serialize cart: %v", err)
-	}
+		if r.Method == "POST" {
+			err := addToCart(c, w, r, cartID)
+			if err != nil {
+				log.Printf("failed to add a product to the cart: %v", err)
+				return
+			}
+		}
 
-	_, err = w.Write(bytes)
-	if err != nil {
-		log.Printf("failed to send result: %v", err)
+		m, free := c.read()
+		defer free()
+
+		pp := positions{}
+		for uuid, count := range m.carts[cartID] {
+			if _, ok := m.products[uuid]; ok {
+				pp = append(pp, &Position{
+					ProductID:     uuid,
+					Price:         m.products[uuid].Price,
+					Title:         m.products[uuid].Title,
+					SmallImageURL: m.products[uuid].SmallImageURL,
+
+					Quantity:    count,
+					MoreInStock: m.stock[uuid] > count,
+					InStock:     m.stock[uuid] >= count,
+				})
+			}
+		}
+		sort.Sort(pp)
+
+		cart := &Cart{
+			Positions: pp,
+		}
+
+		bytes, err := proto.Marshal(cart)
+		if err != nil {
+			log.Printf("failed to serialize cart: %v", err)
+		}
+
+		_, err = w.Write(bytes)
+		if err != nil {
+			log.Printf("failed to send result: %v", err)
+		}
 	}
 }
 
-func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
+func addToCart(c *context, w http.ResponseWriter, r *http.Request, cartID string) error {
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("failed to read from http body: %v", err)
 	}
 
-	var cc ChangeProductQuantity
-	err = proto.Unmarshal(bytes, &cc)
+	cc := &ChangeProductQuantity{}
+	err = proto.Unmarshal(bytes, cc)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("failed to decode cart change: %v", err)
@@ -101,55 +102,29 @@ func addToCart(w http.ResponseWriter, r *http.Request, cartID string) error {
 
 	cc.CartID = cartID
 
-	change := &CheckoutContext{
-		CheckoutContextMsg: &CheckoutContext_ChangeProductQuantity{
-			ChangeProductQuantity: &cc,
-		},
-	}
-	bytes, err = proto.Marshal(change)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("failed to serialize cart change massage: %v", err)
-	}
-
-	msg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Key:   sarama.StringEncoder(cartID),
-		Value: sarama.ByteEncoder(bytes),
-	}
-	_, msgOffset, err := producer.SendMessage(msg)
+	_, msgOffset, err := c.logChangeProductQuantity(cc)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return fmt.Errorf("failed to send cart change to kafka: %v", err)
 	}
 
-	offsetChanged.L.Lock()
-	for offset < msgOffset {
-		offsetChanged.Wait()
-	}
-	offsetChanged.L.Unlock()
+	c.await(msgOffset)
 
 	return nil
 }
 
-func cartProcessor(cc *ChangeProductQuantity, msgOffset int64) error {
-
-	offset = msgOffset
-	defer offsetChanged.Broadcast()
+func updateModelChangeProductQuantity(m *model, offset int64, cc *ChangeProductQuantity) error {
 
 	cartID := cc.CartID
 
-	mut.Lock()
-	defer mut.Unlock()
-
-	if _, ok := carts[cartID]; !ok {
-		carts[cartID] = make(map[string]int64)
+	if _, ok := m.carts[cartID]; !ok {
+		m.carts[cartID] = make(map[string]int64)
 	}
 
-	carts[cartID][cc.ProductID] = cc.Quantity
+	m.carts[cartID][cc.ProductID] = cc.Quantity
 
-	if carts[cartID][cc.ProductID] == 0 {
-		delete(carts[cartID], cc.ProductID)
+	if m.carts[cartID][cc.ProductID] == 0 {
+		delete(m.carts[cartID], cc.ProductID)
 	}
 
 	return nil

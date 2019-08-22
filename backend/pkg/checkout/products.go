@@ -1,10 +1,6 @@
 package checkout
 
-func productsProcessor(p *Product) error {
-	mut.Lock()
-	defer mut.Unlock()
-
-	products[p.ProductID] = p
-
+func updateModelProduct(m *model, offset int64, p *Product) error {
+	m.products[p.ProductID] = p
 	return nil
 }

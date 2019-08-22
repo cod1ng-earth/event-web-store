@@ -68,14 +68,18 @@ sync frontend
 backend
 
 - extract simba
-  - lock: exclusive, sharedread, waitfree
-  - serialize: json, protobuf
-  - configure: massage wrapper
-  - processing: batch & finalize vs single-step
+  - [DONE] lock: exclusive, sharedread, waitfree
+  - [SKIP] serialize: json, protobuf
+  - [DONE] configure: massage wrapper
+  - [DONE] processing: batch & finalize vs single-step
   - batch only during start vs dynamic selection
   - [DONE] sync to other contexts before processing commands
 - extend simba to create bridges
   - share events between contexts
+- CORS
+  - configurable api domain in frontend
+  - configurable spa domain in backend
+  - http handler wrapper for CORS setup
 - production docker image
 - limit cpu and memory use locally
 - remove .uuid
@@ -129,7 +133,7 @@ general
 - add cms
 - add search
 
-## Not needed anymore
+## Maybe later (stick to basics and prove of concept first)
 
 - tilt
 

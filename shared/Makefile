@@ -19,5 +19,5 @@ logs: ##@docker Display kafka and zookeepers logs
 .PHONY: logs
 
 run: ##@docker Run kafka and zookeeper
-	docker-compose up --detach --build
+	docker-compose up --build
 .PHONY: start
