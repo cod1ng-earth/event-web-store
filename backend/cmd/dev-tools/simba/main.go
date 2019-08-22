@@ -76,7 +76,7 @@ func renderTemplate(w io.Writer, name string, batch bool, lock string, messageNa
 		"title": strings.Title,
 	}
 
-	tplString, err := ioutil.ReadFile("cmd/dev-tools/simba/waitfree/context.go")
+	tplString, err := ioutil.ReadFile("cmd/dev-tools/simba/context.go.tpl")
 	if err != nil {
 		log.Fatalf("failed to read template: %v", err)
 	}
