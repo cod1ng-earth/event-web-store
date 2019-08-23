@@ -1,124 +1,42 @@
 package main
 
 import (
-	"encoding/csv"
-	"fmt"
-	"io"
 	"log"
-	"os"
-	"strconv"
 
 	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/warehouse"
 	"gopkg.in/alecthomas/kingpin.v2"
-
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/checkout"
 )
 
 var (
 	brokerList  = kingpin.Flag("brokerList", "List of brokers to connect").Default("kafka:9092").OverrideDefaultFromEnvar("BROKER_LIST").Strings()
-	currentPath = kingpin.Arg("current", "path to current import file").Required().String()
+	verbose     = kingpin.Flag("verbose", "Verbosity").Default("true").Bool()
+	currentPath = kingpin.Arg("path", "path to import file").Required().String()
 )
 
 func main() {
 
 	kingpin.Parse()
 
-	log.Printf("current import file %s", *currentPath)
-
 	config := sarama.NewConfig()
+	config.Consumer.Return.Errors = true
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Flush.MaxMessages = 500
-	producer, err := sarama.NewAsyncProducer(*brokerList, config)
-	if err != nil {
-		log.Panicf("failed to setup the kafka producer: %s", err)
-	}
-	defer func() {
-		if err := producer.Close(); err != nil {
-			log.Panicf("failed to close the kafka producer: %s", err)
-		}
-	}()
+	config.Producer.Return.Successes = true
 
-	go func() {
-		for err := range producer.Errors() {
-			log.Panicf("failed to send msg (key %s): %s", err.Msg.Key, err.Err)
-		}
-	}()
-
-	newStock, err := rows(*currentPath)
-	if err != nil {
-		log.Panicf("failed to load current import file: %s", err)
+	if *verbose {
+		log.Printf("import file = %s", *currentPath)
 	}
 
-	importStock(newStock, producer.Input())
-}
+	warehouse := warehouse.NewContext(brokerList, config)
+	go warehouse.Start()
+	defer warehouse.Stop()
+	warehouse.AwaitLastOffset()
 
-func importStock(stocks map[string][]string, ch chan<- *sarama.ProducerMessage) {
-	for _, row := range stocks {
-
-		stock, err := row2stock(row)
-		if err != nil {
-			log.Panicf("failed to parse stock: %s", err)
-		}
-
-		err = sendUpdate(ch, stock)
-		if err != nil {
-			log.Panicf("failed to send update massage: %s", err)
-		}
-	}
-}
-
-func sendUpdate(ch chan<- *sarama.ProducerMessage, msg *checkout.Stock) error {
-	change := &checkout.CheckoutMessages{
-		CheckoutMessage: &checkout.CheckoutMessages_Stock{
-			Stock: msg,
-		},
-	}
-	bytes, err := proto.Marshal(change)
-	if err != nil {
-		return fmt.Errorf("failed to serialize product delete massage: %s", err)
-	}
-	ch <- &sarama.ProducerMessage{
-		Topic: "checkout",
-		Key:   sarama.StringEncoder(msg.ProductID),
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return nil
-}
-
-func rows(path string) (map[string][]string, error) {
-
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open import file: %s", err)
-	}
-	defer f.Close()
-
-	m := make(map[string][]string)
-	r := csv.NewReader(f)
-	for {
-		row, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		uuid := row[0]
-		m[uuid] = row
-	}
-	return m, nil
-}
-
-func row2stock(row []string) (*checkout.Stock, error) {
-
-	if row == nil {
-		return nil, nil
+	if *verbose {
+		log.Printf("context started up")
 	}
 
-	quantity, err := strconv.ParseInt(row[1], 10, 64)
-	if err != nil {
-		return &checkout.Stock{}, fmt.Errorf("stock quantity can not be parsed '%v': %v", row, err)
-	}
-	return &checkout.Stock{
-		ProductID: row[0],
-		Quantity:  quantity,
-	}, nil
+	warehouse.ImportFile(*currentPath, *verbose)
 }

@@ -11,6 +11,6 @@ func newModel() *model {
 }
 
 func updateModelStockCorrected(m *model, offset int64, correction *StockCorrected) error {
-	m.inventory[correction.ProductID] = correction.Quantity
+	m.inventory[correction.ProductID] += correction.QuantityChange
 	return nil
 }

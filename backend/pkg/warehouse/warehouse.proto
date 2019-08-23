@@ -10,5 +10,5 @@ message WarehouseMessages {
 
 message StockCorrected {
     string productID = 1;
-    int64 quantity = 2;
+    int64 quantityChange = 2;
 }

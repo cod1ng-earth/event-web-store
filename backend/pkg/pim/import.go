@@ -51,7 +51,6 @@ func (c *context) ImportFile(path string, verbose bool) {
 		// if new or changed -> upsert
 		_, _, err = c.logProduct(newProduct)
 		if err != nil {
-			log.Printf("store %v", oldProduct.Id)
 			log.Fatalf("failed to store product %v: %v", newProduct, err)
 		}
 	}
