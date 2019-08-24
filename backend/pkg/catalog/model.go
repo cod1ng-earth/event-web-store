@@ -1,3 +1,6 @@
+//go:generate sh -c "../../cmd/dev-tools/simba/simba -readLock=wait-free -batch=true | gofmt -s > context.go"
+//go:generate protoc --go_out=. catalog.proto
+
 package catalog
 
 import (

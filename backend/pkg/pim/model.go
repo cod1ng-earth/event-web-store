@@ -1,3 +1,6 @@
+//go:generate sh -c "../../cmd/dev-tools/simba/simba | gofmt -s > context.go"
+//go:generate protoc --go_out=. pim.proto
+
 package pim
 
 type model struct {

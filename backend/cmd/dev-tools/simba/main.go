@@ -1,11 +1,13 @@
+//go:generate go-bindata context.go.tpl
+
 package main
 
 import (
 	"flag"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"strings"
 	"text/template"
 
@@ -14,29 +16,30 @@ import (
 
 func main() {
 
-	name := flag.String("name", "", "name of the context")
 	batch := flag.Bool("batch", false, "use batch+finalize in addition to modify")
 	readLock := flag.String("readLock", "parallel", "lock to protect model: exclusive, parallel, wait-free")
 	flag.Parse()
-
-	if *name == "" {
-		log.Fatalf("name can not be empty")
-	}
 
 	if *readLock != "exclusive" && *readLock != "parallel" && *readLock != "wait-free" {
 		log.Fatalf("readLock '%s' unknown", *readLock)
 	}
 
-	messageNames, ok := findMessageNames(*name)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	name := path.Base(currentDir)
+
+	messageNames, ok := findMessageNames(name)
 	if !ok {
 		log.Fatalf("topic wrap message not defined in proto file")
 	}
 
-	renderTemplate(os.Stdout, *name, *batch, *readLock, messageNames)
+	renderTemplate(os.Stdout, name, *batch, *readLock, messageNames)
 }
 
 func findMessageNames(name string) ([]string, bool) {
-	reader, err := os.Open("pkg/" + name + "/" + name + ".proto")
+	reader, err := os.Open(name + ".proto")
 	if err != nil {
 		log.Printf("failed to read proto file: %s", err)
 		os.Exit(1)
@@ -72,20 +75,6 @@ func findMessageNames(name string) ([]string, bool) {
 }
 
 func renderTemplate(w io.Writer, name string, batch bool, lock string, messageNames []string) {
-	funcMap := template.FuncMap{
-		"title": strings.Title,
-	}
-
-	tplString, err := ioutil.ReadFile("cmd/dev-tools/simba/context.go.tpl")
-	if err != nil {
-		log.Fatalf("failed to read template: %v", err)
-	}
-
-	tpl, err := template.New("context").Funcs(funcMap).Parse(string(tplString))
-	if err != nil {
-		log.Fatalf("parsing: %s", err)
-	}
-
 	data := struct {
 		Name         string
 		Batch        bool
@@ -96,6 +85,14 @@ func renderTemplate(w io.Writer, name string, batch bool, lock string, messageNa
 		Batch:        batch,
 		Lock:         lock,
 		MessageNames: messageNames,
+	}
+
+	funcMap := template.FuncMap{
+		"title": strings.Title,
+	}
+	tpl, err := template.New("context").Funcs(funcMap).Parse(string(MustAsset("context.go.tpl")))
+	if err != nil {
+		log.Fatalf("parsing: %s", err)
 	}
 
 	err = tpl.Execute(w, data)

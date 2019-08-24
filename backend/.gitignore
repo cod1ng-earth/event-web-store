@@ -2,3 +2,4 @@ tmp
 *.csv
 results.bin
 plot.html
+cmd/dev-tools/simba/simba
