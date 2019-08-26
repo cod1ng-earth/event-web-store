@@ -1,4 +1,5 @@
-//go:generate sh -c "../../cmd/dev-tools/simba/simba | gofmt -s > context.go"
+//go:generate sh -c "../../cmd/dev-tools/simba/simba > context.go"
+///go:generate gofmt -s w context.go
 //go:generate protoc --go_out=. warehouse.proto
 
 package warehouse

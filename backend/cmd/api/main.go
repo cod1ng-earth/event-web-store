@@ -12,14 +12,11 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-var (
-	brokerList  = kingpin.Flag("brokerList", "List of brokers to connect").Default("kafka:9092").OverrideDefaultFromEnvar("BROKER_LIST").Strings()
-	contextList = kingpin.Flag("contexts", "List of contexts to run").Default("all").Strings()
-)
-
 func main() {
 	log.Println("Hello, world!")
 
+	brokers := kingpin.Flag("broker", "kafka broker to connect").Default("kafka:9092").OverrideDefaultFromEnvar("BROKER").Strings()
+	//contexts := kingpin.Flag("context", "contexts to run").Strings()
 	kingpin.Parse()
 
 	config := sarama.NewConfig()
@@ -29,14 +26,14 @@ func main() {
 	config.Producer.Flush.MaxMessages = 500
 	config.Producer.Return.Successes = true
 
-	cat := catalog.NewContext(brokerList, config)
+	cat := catalog.NewContext(brokers, config)
 	go cat.Start()
 	defer cat.Stop()
 	cat.AwaitLastOffset()
 	http.HandleFunc("/product", cat.NewPDPHandler())
 	http.HandleFunc("/products", cat.NewCatalogHandler())
 
-	ckt := checkout.NewContext(brokerList, config)
+	ckt := checkout.NewContext(brokers, config)
 	go ckt.Start()
 	defer ckt.Stop()
 	ckt.AwaitLastOffset()
@@ -44,6 +41,10 @@ func main() {
 	http.HandleFunc("/orderCart", ckt.NewOrderHandler())
 
 	http.Handle("/metrics", promhttp.Handler())
+
+	// TODO wait for brides to be up to date
+	// TODO wait for updater to be up to date
+	// TODO do not leak pim offset to frontend
 
 	log.Println("listening on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

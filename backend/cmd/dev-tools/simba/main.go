@@ -3,23 +3,42 @@
 package main
 
 import (
-	"flag"
 	"io"
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/emicklei/proto"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
+
+type contextDescription struct {
+	Name         string
+	Batch        bool
+	ReadLock     string
+	MessageNames []string
+	Bridges      []bridgeDescription
+}
+
+type bridgeDescription struct {
+	Name         string
+	PkgPath      string
+	MessageNames []string
+}
 
 func main() {
 
-	batch := flag.Bool("batch", false, "use batch+finalize in addition to modify")
-	readLock := flag.String("readLock", "parallel", "lock to protect model: exclusive, parallel, wait-free")
-	flag.Parse()
+	batch := kingpin.Flag("batch", "use batch+finalize in addition to modify").Bool()
+	readLock := kingpin.Flag("lock", "lock to protect model: exclusive, parallel, wait-free").String()
+	bridges := kingpin.Flag("bridge", "connections to other contexts").Strings()
+	kingpin.Parse()
 
+	if *readLock == "" {
+		*readLock = "parallel"
+	}
 	if *readLock != "exclusive" && *readLock != "parallel" && *readLock != "wait-free" {
 		log.Fatalf("readLock '%s' unknown", *readLock)
 	}
@@ -30,16 +49,45 @@ func main() {
 	}
 	name := path.Base(currentDir)
 
+	desc := createContextDescription(name, *batch, *readLock, *bridges)
+	renderTemplate(os.Stdout, desc)
+}
+
+func createContextDescription(name string, batch bool, readLock string, bridges []string) contextDescription {
+
+	desc := contextDescription{
+		Name:     name,
+		Batch:    batch,
+		ReadLock: readLock,
+	}
+
 	messageNames, ok := findMessageNames(name)
 	if !ok {
 		log.Fatalf("topic wrap message not defined in proto file")
 	}
+	desc.MessageNames = messageNames
 
-	renderTemplate(os.Stdout, name, *batch, *readLock, messageNames)
+	bridgeDescs := []bridgeDescription{}
+	for _, bridge := range bridges {
+		name = path.Base(bridge)
+		messageNames, ok := findMessageNames(name)
+		if !ok {
+			log.Fatalf("topic wrap message not defined in proto file for bridge %v", bridge)
+		}
+
+		bridgeDescs = append(bridgeDescs, bridgeDescription{
+			Name:         name,
+			PkgPath:      bridge,
+			MessageNames: messageNames,
+		})
+	}
+	desc.Bridges = bridgeDescs
+
+	return desc
 }
 
 func findMessageNames(name string) ([]string, bool) {
-	reader, err := os.Open(name + ".proto")
+	reader, err := os.Open(filepath.Join("..", name, name+".proto"))
 	if err != nil {
 		log.Printf("failed to read proto file: %s", err)
 		os.Exit(1)
@@ -54,7 +102,6 @@ func findMessageNames(name string) ([]string, bool) {
 	}
 
 	names := []string{}
-
 	proto.Walk(definition, proto.WithOneof(func(m *proto.Oneof) {
 		if m.Name != name+"Message" {
 			return
@@ -74,19 +121,7 @@ func findMessageNames(name string) ([]string, bool) {
 	return names, len(names) != 0
 }
 
-func renderTemplate(w io.Writer, name string, batch bool, lock string, messageNames []string) {
-	data := struct {
-		Name         string
-		Batch        bool
-		Lock         string
-		MessageNames []string
-	}{
-		Name:         name,
-		Batch:        batch,
-		Lock:         lock,
-		MessageNames: messageNames,
-	}
-
+func renderTemplate(w io.Writer, desc contextDescription) {
 	funcMap := template.FuncMap{
 		"title": strings.Title,
 	}
@@ -95,7 +130,7 @@ func renderTemplate(w io.Writer, name string, batch bool, lock string, messageNa
 		log.Fatalf("parsing: %s", err)
 	}
 
-	err = tpl.Execute(w, data)
+	err = tpl.Execute(w, desc)
 	if err != nil {
 		log.Fatalf("template execution failed: %v", err)
 	}

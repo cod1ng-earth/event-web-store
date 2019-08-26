@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"log"
 	"sync"
-{{ if eq .Lock "wait-free" }}
+{{ if eq .ReadLock "wait-free" }}
 	"sync/atomic"
 	"time"
 {{ end }}
 
-	"github.com/golang/protobuf/proto"
 	"github.com/Shopify/sarama"
+	"github.com/golang/protobuf/proto"
+
+{{ range .Bridges }}
+	"{{ .PkgPath }}"
+{{ end }}
 )
 
 const (
@@ -22,22 +26,22 @@ const (
 
 type context struct {
 	doneCh    chan struct{}
+{{ range .Bridges }}
+	doneCh{{ .Name | title }}    chan struct{}
+{{ end }}
 	client    sarama.Client
 	consumer  sarama.Consumer
 	producer  sarama.SyncProducer
-	partition sarama.PartitionConsumer
 
 	batchOffset int64
 
-{{ if eq .Lock "exclusive" }}
+{{ if eq .ReadLock "exclusive" }}
 	model  *model
 	lock   *sync.Mutex
-	writes chan *sarama.ConsumerMessage
-{{ else if eq .Lock "parallel" }}
+{{ else if eq .ReadLock "parallel" }}
 	model  *model
 	lock   *sync.RWMutex
-	writes chan *sarama.ConsumerMessage
-{{ else if eq .Lock "wait-free" }}
+{{ else if eq .ReadLock "wait-free" }}
 	readerAChanged *sync.Cond
 	readerBChanged *sync.Cond
 	aIsReading     bool
@@ -46,7 +50,6 @@ type context struct {
 	modelA         *model
 	modelB         *model
 
-	writes     chan *sarama.ConsumerMessage
 	writesRedo chan *sarama.ConsumerMessage
 {{ end }}
 
@@ -68,10 +71,6 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	if err != nil {
 		log.Panicf("failed to setup kafka producer: %s", err)
 	}
-	partition, err := consumer.ConsumePartition(Topic, 0, 0)
-	if err != nil {
-		log.Panicf("failed to setup kafka partition: %s", err)
-	}
 
 	batchOffset, err := client.GetOffset(Topic, Partition, sarama.OffsetNewest)
 	if err != nil {
@@ -81,22 +80,22 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 
 	context := context{
 		doneCh:    make(chan struct{}, 1),
+	{{ range .Bridges }}
+		doneCh{{ .Name | title }}: make(chan struct{}, 1),
+	{{ end }}
 		client:    client,
 		consumer:  consumer,
 		producer:  producer,
-		partition: partition,
 
 		batchOffset: batchOffset,
 
-	{{ if eq .Lock "exclusive" }}
+	{{ if eq .ReadLock "exclusive" }}
 		model:  newModel(),
 		lock:   &sync.Mutex{},
-		writes: make(chan *sarama.ConsumerMessage, 32768),
-	{{ else if eq .Lock "parallel" }}
+	{{ else if eq .ReadLock "parallel" }}
 		model:  newModel(),
 		lock:   &sync.RWMutex{},
-		writes: make(chan *sarama.ConsumerMessage, 32768),
-	{{ else if eq .Lock "wait-free" }}
+	{{ else if eq .ReadLock "wait-free" }}
 		readerAChanged: sync.NewCond(&sync.Mutex{}),
 		readerBChanged: sync.NewCond(&sync.Mutex{}),
 		aIsReading:     true,
@@ -105,7 +104,6 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 		modelA:         newModel(),
 		modelB:         newModel(),
 
-		writes:     make(chan *sarama.ConsumerMessage, 32768),
 		writesRedo: make(chan *sarama.ConsumerMessage, 32768),
 	{{ end }}
 
@@ -138,14 +136,18 @@ func (c *context) AwaitLastOffset() {
 	c.offsetChanged.L.Unlock()
 }
 
-func (c *context) updateLoop() {
+func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
+
+	{{ if eq .ReadLock "wait-free" }}
+	writesRedo := make(chan *sarama.ConsumerMessage, 32768)
+	{{ end }}
 
 	for {
-	{{ if or (eq .Lock "exclusive") (eq .Lock "parallel") }}
-		for msg := range c.writes {
+	{{ if or (eq .ReadLock "exclusive") (eq .ReadLock "parallel") }}
+		for msg := range writes {
 			applyChange(msg, c.model, c)
 		}
-	{{ else if eq .Lock "wait-free" }}
+	{{ else if eq .ReadLock "wait-free" }}
 		writeDelay := 0 * time.Second
 
 		model := c.modelA
@@ -163,29 +165,29 @@ func (c *context) updateLoop() {
 		}
 		waiter.L.Unlock()
 
-		for len(c.writesRedo) > 0 {
-			msg, ok := <-c.writesRedo
+		for len(writesRedo) > 0 {
+			msg, ok := <-writesRedo
 			if ok {
 				applyChange(msg, model, c)
 			}
 		}
 
-		msg, ok := <-c.writes
+		msg, ok := <-writes
 		if !ok {
 			return
 		}
-		c.writesRedo <- msg
+		writesRedo <- msg
 		start := time.Now()
 		applyChange(msg, model, c)
 		offset := msg.Offset
 		writeDelay += time.Since(start)
 
-		for writeDelay < 10*time.Millisecond && len(c.writes) > 0 && len(c.writesRedo) < 32768 {
-			msg, ok := <-c.writes
+		for writeDelay < 10*time.Millisecond && len(writes) > 0 && len(writesRedo) < 32768 {
+			msg, ok := <-writes
 			if !ok {
 				return
 			}
-			c.writesRedo <- msg
+			writesRedo <- msg
 			start := time.Now()
 			applyChange(msg, model, c)
 			offset = msg.Offset
@@ -203,7 +205,7 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
 //	log.Printf("applying message with offset %v", msg.Offset)
 
-{{ if or (eq .Lock "exclusive") (eq .Lock "parallel") }}
+{{ if or (eq .ReadLock "exclusive") (eq .ReadLock "parallel") }}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	defer func() {
@@ -226,27 +228,91 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 {{ end }}
 }
 
+{{ range .Bridges }}
+func (c *context) bridge{{ .Name | title }}() {
+
+	c.AwaitLastOffset()
+
+	model, free := c.read()
+	pimOffset := model.getPimOffset()
+	free()
+	partition, err := c.consumer.ConsumePartition({{ .Name }}.Topic, 0, pimOffset)
+	if err != nil {
+		log.Panicf("failed to setup kafka partition: %s", err)
+	}
+
+	log.Printf("starting bridge %v", Topic)
+
+	for {
+		select {
+		case err := <-partition.Errors():
+			log.Printf("failure from kafka consumer: %s", err)
+
+		case msg := <-partition.Messages():
+//			log.Printf("recieved message with offset %v", msg.Offset)
+
+			cc := {{ .Name }}.{{ .Name | title }}Messages{}
+			err := proto.Unmarshal(msg.Value, &cc)
+			if err != nil {
+				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+			}
+
+			switch x := cc.Get{{ .Name | title }}Message().(type) {
+
+			{{$bridge := .}}
+			{{ range .MessageNames }}
+			case *{{ $bridge.Name }}.{{ $bridge.Name | title }}Messages_{{ . | title }}:
+				if err := translate{{ $bridge.Name | title }}{{ . | title }}(c, model, msg.Offset, cc.Get{{ . | title }}()); err != nil {
+					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
+				}
+			{{ end }}
+
+			case nil:
+				panic(fmt.Sprintf("context message is empty"))
+
+			default:
+				panic(fmt.Sprintf("unexpected type %T in oneof", x))
+			}
+
+		}
+	}
+}
+{{ end }}
+
 func (c *context) Start() {
 
 	log.Printf("starting context %v", Topic)
 
-	go c.updateLoop()
+	writes := make(chan *sarama.ConsumerMessage, 32768)
+	go c.updateLoop(writes)
+
+	partition, err := c.consumer.ConsumePartition(Topic, 0, 0)
+	if err != nil {
+		log.Panicf("failed to setup kafka partition: %s", err)
+	}
+
+{{ range .Bridges }}
+		go c.bridge{{ .Name | title }}()
+{{ end }}
 
 	for {
 		select {
-		case err := <-c.partition.Errors():
+		case err := <-partition.Errors():
 			log.Printf("failure from kafka consumer: %s", err)
 
-		case msg := <-c.partition.Messages():
+		case msg := <-partition.Messages():
 //			log.Printf("recieved message with offset %v", msg.Offset)
-			c.writes <- msg
+			writes <- msg
 
 		case <-c.doneCh:
-			close(c.writes)
 			log.Print("interrupt is detected")
-			if err := c.partition.Close(); err != nil {
+			{{ range .Bridges }}
+				c.doneCh{{ .Name | title }} <- struct{}{}
+			{{ end }}
+			if err := partition.Close(); err != nil {
 				log.Panicf("failed to close kafka partition: %s", err)
 			}
+			close(writes)
 			if err := c.consumer.Close(); err != nil {
 				log.Panicf("failed to close kafka consumer: %s", err)
 			}
@@ -269,13 +335,13 @@ func (c *context) read() (*model, func()) {
 	}
 	c.offsetChanged.L.Unlock()
 
-{{ if eq .Lock "exclusive" }}
+{{ if eq .ReadLock "exclusive" }}
 	c.lock.Lock()
 	return c.model, c.lock.Unlock
-{{ else if eq .Lock "parallel" }}
+{{ else if eq .ReadLock "parallel" }}
 	c.lock.RLock()
 	return c.model, c.lock.RUnlock
-{{ else if eq .Lock "wait-free" }}
+{{ else if eq .ReadLock "wait-free" }}
 	atomic.AddInt32(&c.readersA, 1)
 	atomic.AddInt32(&c.readersB, 1)
 

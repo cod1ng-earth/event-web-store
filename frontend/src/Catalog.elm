@@ -81,6 +81,7 @@ type alias Product =
     , smallImageURL : String
     , largeImageURL : String
     , disabled : Bool
+    , pimOffset : Int
     }
 
 
@@ -120,7 +121,7 @@ catalogPageDecoder =
 -}
 productDecoder : Decode.Decoder Product
 productDecoder =
-    Decode.message (Product "" 0 "" "" "" "" "" "" False)
+    Decode.message (Product "" 0 "" "" "" "" "" "" False 0)
         [ Decode.optional 1 Decode.string setId
         , Decode.optional 2 Decode.int32 setPrice
         , Decode.optional 3 Decode.string setName
@@ -130,6 +131,7 @@ productDecoder =
         , Decode.optional 7 Decode.string setSmallImageURL
         , Decode.optional 8 Decode.string setLargeImageURL
         , Decode.optional 9 Decode.bool setDisabled
+        , Decode.optional 10 Decode.int32 setPimOffset
         ]
 
 
@@ -183,6 +185,7 @@ toProductEncoder model =
         , ( 7, Encode.string model.smallImageURL )
         , ( 8, Encode.string model.largeImageURL )
         , ( 9, Encode.bool model.disabled )
+        , ( 10, Encode.int32 model.pimOffset )
         ]
 
 
@@ -278,3 +281,8 @@ setLargeImageURL value model =
 setDisabled : a -> { b | disabled : a } -> { b | disabled : a }
 setDisabled value model =
     { model | disabled = value }
+
+
+setPimOffset : a -> { b | pimOffset : a } -> { b | pimOffset : a }
+setPimOffset value model =
+    { model | pimOffset = value }

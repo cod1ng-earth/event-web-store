@@ -29,4 +29,5 @@ message Product {
     string smallImageURL = 7;
     string largeImageURL = 8;
     bool disabled = 9;
+    int64 pimOffset = 10;
 }
