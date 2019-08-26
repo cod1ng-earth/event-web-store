@@ -343,8 +343,8 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	switch x := cc.GetCatalogMessage().(type) {
 
 	
-	case *CatalogMessages_Product:
-		return batchUpdateModelProduct(model, msg.Offset, cc.GetProduct())
+	case *CatalogMessages_PimProduct:
+		return batchUpdateModelPimProduct(model, msg.Offset, cc.GetPimProduct())
 	
 
 	case nil:
@@ -366,8 +366,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	switch x := cc.GetCatalogMessage().(type) {
 
 	
-	case *CatalogMessages_Product:
-		return updateModelProduct(model, msg.Offset, cc.GetProduct())
+	case *CatalogMessages_PimProduct:
+		return updateModelPimProduct(model, msg.Offset, cc.GetPimProduct())
 	
 
 	case nil:
@@ -379,11 +379,11 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 }
 
 
-func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
+func (c *context) logPimProduct(logMsg *PimProduct) (int32, int64, error) {
 
 	change := &CatalogMessages{
-		CatalogMessage: &CatalogMessages_Product{
-			Product: logMsg,
+		CatalogMessage: &CatalogMessages_PimProduct{
+			PimProduct: logMsg,
 		},
 	}
 

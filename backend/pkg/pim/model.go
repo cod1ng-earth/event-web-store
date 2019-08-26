@@ -4,6 +4,8 @@
 
 package pim
 
+import "log"
+
 type model struct {
 	products map[string]*Product
 }
@@ -15,6 +17,7 @@ func newModel() *model {
 }
 
 func updateModelProduct(m *model, offset int64, product *Product) error {
+	log.Printf("updateModelProduct %v", offset)
 	m.products[product.Id] = product
 	return nil
 }

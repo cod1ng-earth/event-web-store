@@ -2,9 +2,9 @@
 
 
 module Catalog exposing
-    ( CatalogMessage(..), CatalogMessages, CatalogPage, Product
-    , catalogMessagesDecoder, catalogPageDecoder, productDecoder
-    , toCatalogMessagesEncoder, toCatalogPageEncoder, toProductEncoder
+    ( CatalogMessage(..), CatalogMessages, CatalogPage, Product, PimProduct
+    , catalogMessagesDecoder, catalogPageDecoder, productDecoder, pimProductDecoder
+    , toCatalogMessagesEncoder, toCatalogPageEncoder, toProductEncoder, toPimProductEncoder
     )
 
 {-| ProtoBuf module: `Catalog`
@@ -20,17 +20,17 @@ To run it use [`elm-protocol-buffers`](https://package.elm-lang.org/packages/eri
 
 # Model
 
-@docs CatalogMessage, CatalogMessages, CatalogPage, Product
+@docs CatalogMessage, CatalogMessages, CatalogPage, Product, PimProduct
 
 
 # Decoder
 
-@docs catalogMessagesDecoder, catalogPageDecoder, productDecoder
+@docs catalogMessagesDecoder, catalogPageDecoder, productDecoder, pimProductDecoder
 
 
 # Encoder
 
-@docs toCatalogMessagesEncoder, toCatalogPageEncoder, toProductEncoder
+@docs toCatalogMessagesEncoder, toCatalogPageEncoder, toProductEncoder, toPimProductEncoder
 
 -}
 
@@ -45,7 +45,7 @@ import Protobuf.Encode as Encode
 {-| CatalogMessage
 -}
 type CatalogMessage
-    = CatalogMessageProduct Product
+    = CatalogMessagePimProduct PimProduct
 
 
 {-| `CatalogMessages` message
@@ -81,6 +81,21 @@ type alias Product =
     , smallImageURL : String
     , largeImageURL : String
     , disabled : Bool
+    }
+
+
+{-| `PimProduct` message
+-}
+type alias PimProduct =
+    { id : String
+    , price : Int
+    , name : String
+    , description : String
+    , longtext : String
+    , category : String
+    , smallImageURL : String
+    , largeImageURL : String
+    , disabled : Bool
     , pimOffset : Int
     }
 
@@ -95,7 +110,7 @@ catalogMessagesDecoder : Decode.Decoder CatalogMessages
 catalogMessagesDecoder =
     Decode.message (CatalogMessages Nothing)
         [ Decode.oneOf
-            [ ( 1, Decode.map CatalogMessageProduct productDecoder )
+            [ ( 1, Decode.map CatalogMessagePimProduct pimProductDecoder )
             ]
             setCatalogMessage
         ]
@@ -121,7 +136,24 @@ catalogPageDecoder =
 -}
 productDecoder : Decode.Decoder Product
 productDecoder =
-    Decode.message (Product "" 0 "" "" "" "" "" "" False 0)
+    Decode.message (Product "" 0 "" "" "" "" "" "" False)
+        [ Decode.optional 1 Decode.string setId
+        , Decode.optional 2 Decode.int32 setPrice
+        , Decode.optional 3 Decode.string setName
+        , Decode.optional 4 Decode.string setDescription
+        , Decode.optional 5 Decode.string setLongtext
+        , Decode.optional 6 Decode.string setCategory
+        , Decode.optional 7 Decode.string setSmallImageURL
+        , Decode.optional 8 Decode.string setLargeImageURL
+        , Decode.optional 9 Decode.bool setDisabled
+        ]
+
+
+{-| `PimProduct` decoder
+-}
+pimProductDecoder : Decode.Decoder PimProduct
+pimProductDecoder =
+    Decode.message (PimProduct "" 0 "" "" "" "" "" "" False 0)
         [ Decode.optional 1 Decode.string setId
         , Decode.optional 2 Decode.int32 setPrice
         , Decode.optional 3 Decode.string setName
@@ -142,8 +174,8 @@ productDecoder =
 toCatalogMessageEncoder : CatalogMessage -> ( Int, Encode.Encoder )
 toCatalogMessageEncoder model =
     case model of
-        CatalogMessageProduct value ->
-            ( 1, toProductEncoder value )
+        CatalogMessagePimProduct value ->
+            ( 1, toPimProductEncoder value )
 
 
 {-| `CatalogMessages` encoder
@@ -175,6 +207,23 @@ toCatalogPageEncoder model =
 -}
 toProductEncoder : Product -> Encode.Encoder
 toProductEncoder model =
+    Encode.message
+        [ ( 1, Encode.string model.id )
+        , ( 2, Encode.int32 model.price )
+        , ( 3, Encode.string model.name )
+        , ( 4, Encode.string model.description )
+        , ( 5, Encode.string model.longtext )
+        , ( 6, Encode.string model.category )
+        , ( 7, Encode.string model.smallImageURL )
+        , ( 8, Encode.string model.largeImageURL )
+        , ( 9, Encode.bool model.disabled )
+        ]
+
+
+{-| `PimProduct` encoder
+-}
+toPimProductEncoder : PimProduct -> Encode.Encoder
+toPimProductEncoder model =
     Encode.message
         [ ( 1, Encode.string model.id )
         , ( 2, Encode.int32 model.price )

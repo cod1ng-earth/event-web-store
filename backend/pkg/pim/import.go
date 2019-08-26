@@ -11,8 +11,12 @@ import (
 
 func (c *context) ImportFile(path string, verbose bool) {
 
+	log.Print("ImportFile")
+
 	model, free := c.read()
 	defer free()
+
+	log.Print("accessing model")
 
 	oldProducts := make(map[string]*Product)
 	for _, product := range model.products {
@@ -31,10 +35,14 @@ func (c *context) ImportFile(path string, verbose bool) {
 	}
 	defer f.Close()
 
+	log.Print("pre parseProducts")
 	newProducts := make(chan *Product)
 	go parseProducts(f, newProducts)
+	log.Print("post parseProducts")
 
 	for newProduct := range newProducts {
+
+		log.Print("newProduct := loop")
 
 		oldProduct, found := oldProducts[newProduct.Id]
 
