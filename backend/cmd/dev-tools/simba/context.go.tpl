@@ -233,9 +233,9 @@ func (c *context) bridge{{ .Name | title }}() {
 	c.AwaitLastOffset()
 
 	model, free := c.read()
-	pimOffset := model.getPimOffset()
+	{{ .Name }}Offset := model.get{{ .Name | title }}Offset()
 	free()
-	partition, err := c.consumer.ConsumePartition({{ .Name }}.Topic, 0, pimOffset)
+	partition, err := c.consumer.ConsumePartition({{ .Name }}.Topic, 0, {{ .Name }}Offset)
 	if err != nil {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
@@ -411,7 +411,7 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 {{ range .MessageNames }}
 func (c *context) log{{ . | title }}(logMsg *{{ . | title }}) (int32, int64, error) {
 
-	log.Printf("log{{ . | title }} %v", logMsg.Offset);
+	//log.Printf("log{{ . | title }}");
 
 	change := &{{ $.Name | title }}Messages{
 		{{ $.Name | title }}Message: &{{ $.Name | title }}Messages_{{ . | title }}{

@@ -7,8 +7,11 @@ import (
 	"log"
 	"sync"
 
+
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
+
+
 )
 
 const (
@@ -17,16 +20,18 @@ const (
 )
 
 type context struct {
-	doneCh chan struct{}
+	doneCh    chan struct{}
 
-	client   sarama.Client
-	consumer sarama.Consumer
-	producer sarama.AsyncProducer
+	client    sarama.Client
+	consumer  sarama.Consumer
+	producer  sarama.SyncProducer
 
 	batchOffset int64
 
-	model *model
-	lock  *sync.RWMutex
+
+	model  *model
+	lock   *sync.RWMutex
+
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -42,7 +47,7 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
-	producer, err := sarama.NewAsyncProducerFromClient(client)
+	producer, err := sarama.NewSyncProducerFromClient(client)
 	if err != nil {
 		log.Panicf("failed to setup kafka producer: %s", err)
 	}
@@ -54,16 +59,18 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	batchOffset--
 
 	context := context{
-		doneCh: make(chan struct{}, 1),
-
-		client:   client,
-		consumer: consumer,
-		producer: producer,
+		doneCh:    make(chan struct{}, 1),
+	
+		client:    client,
+		consumer:  consumer,
+		producer:  producer,
 
 		batchOffset: batchOffset,
 
-		model: newModel(),
-		lock:  &sync.RWMutex{},
+	
+		model:  newModel(),
+		lock:   &sync.RWMutex{},
+	
 
 		offset:        0,
 		offsetChanged: sync.NewCond(&sync.Mutex{}),
@@ -76,6 +83,9 @@ func (c *context) Stop() {
 }
 
 func (c *context) await(offset int64) {
+	if offset == -1 {
+		return
+	}
 	if c.offset >= offset {
 		return
 	}
@@ -87,27 +97,26 @@ func (c *context) await(offset int64) {
 }
 
 func (c *context) AwaitLastOffset() {
-	c.offsetChanged.L.Lock()
-	for c.offset < c.batchOffset {
-		c.offsetChanged.Wait()
-	}
-	c.offsetChanged.L.Unlock()
+	c.await(c.batchOffset)
 }
 
 func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
 
-	for {
+	
 
+	for {
+	
 		for msg := range writes {
 			applyChange(msg, c.model, c)
 		}
-
+	
 	}
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
-	//	log.Printf("applying message with offset %v", msg.Offset)
+//	log.Printf("applying message with offset %v", msg.Offset)
+
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -116,9 +125,13 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 		c.offsetChanged.Broadcast()
 	}()
 
+
+
 	updateModel(msg, m)
 
 }
+
+
 
 func (c *context) Start() {
 
@@ -132,18 +145,20 @@ func (c *context) Start() {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
 
+
+
 	for {
 		select {
 		case err := <-partition.Errors():
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-partition.Messages():
-			//			log.Printf("recieved message with offset %v", msg.Offset)
+//			log.Printf("recieved message with offset %v", msg.Offset)
 			writes <- msg
 
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
-
+			
 			if err := partition.Close(); err != nil {
 				log.Panicf("failed to close kafka partition: %s", err)
 			}
@@ -170,10 +185,13 @@ func (c *context) read() (*model, func()) {
 	}
 	c.offsetChanged.L.Unlock()
 
+
 	c.lock.RLock()
 	return c.model, c.lock.RUnlock
 
 }
+
+
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	cc := PimMessages{}
@@ -184,8 +202,10 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	switch x := cc.GetPimMessage().(type) {
 
+	
 	case *PimMessages_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
+	
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -195,7 +215,10 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	}
 }
 
+
 func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
+
+	//log.Printf("logProduct");
 
 	change := &PimMessages{
 		PimMessage: &PimMessages_Product{
@@ -212,5 +235,6 @@ func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.Input <- msg
+	return c.producer.SendMessage(msg)
 }
+

@@ -106,6 +106,9 @@ func (c *context) Stop() {
 }
 
 func (c *context) await(offset int64) {
+	if offset == -1 {
+		return
+	}
 	if c.offset >= offset {
 		return
 	}
@@ -117,11 +120,7 @@ func (c *context) await(offset int64) {
 }
 
 func (c *context) AwaitLastOffset() {
-	c.offsetChanged.L.Lock()
-	for c.offset < c.batchOffset {
-		c.offsetChanged.Wait()
-	}
-	c.offsetChanged.L.Unlock()
+	c.await(c.batchOffset)
 }
 
 func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
@@ -380,6 +379,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 
 func (c *context) logPimProduct(logMsg *PimProduct) (int32, int64, error) {
+
+	//log.Printf("logPimProduct");
 
 	change := &CatalogMessages{
 		CatalogMessage: &CatalogMessages_PimProduct{

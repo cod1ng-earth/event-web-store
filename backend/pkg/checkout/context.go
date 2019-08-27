@@ -12,6 +12,10 @@ import (
 	"github.com/golang/protobuf/proto"
 
 
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/pim"
+
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/warehouse"
+
 )
 
 const (
@@ -21,6 +25,10 @@ const (
 
 type context struct {
 	doneCh    chan struct{}
+
+	doneChPim    chan struct{}
+
+	doneChWarehouse    chan struct{}
 
 	client    sarama.Client
 	consumer  sarama.Consumer
@@ -61,6 +69,10 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	context := context{
 		doneCh:    make(chan struct{}, 1),
 	
+		doneChPim: make(chan struct{}, 1),
+	
+		doneChWarehouse: make(chan struct{}, 1),
+	
 		client:    client,
 		consumer:  consumer,
 		producer:  producer,
@@ -83,6 +95,9 @@ func (c *context) Stop() {
 }
 
 func (c *context) await(offset int64) {
+	if offset == -1 {
+		return
+	}
 	if c.offset >= offset {
 		return
 	}
@@ -94,11 +109,7 @@ func (c *context) await(offset int64) {
 }
 
 func (c *context) AwaitLastOffset() {
-	c.offsetChanged.L.Lock()
-	for c.offset < c.batchOffset {
-		c.offsetChanged.Wait()
-	}
-	c.offsetChanged.L.Unlock()
+	c.await(c.batchOffset)
 }
 
 func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
@@ -133,6 +144,104 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 }
 
 
+func (c *context) bridgePim() {
+
+	c.AwaitLastOffset()
+
+	model, free := c.read()
+	pimOffset := model.getPimOffset()
+	free()
+	partition, err := c.consumer.ConsumePartition(pim.Topic, 0, pimOffset)
+	if err != nil {
+		log.Panicf("failed to setup kafka partition: %s", err)
+	}
+
+	log.Printf("starting bridge %v", Topic)
+
+	for {
+		select {
+		case err := <-partition.Errors():
+			log.Printf("failure from kafka consumer: %s", err)
+
+		case msg := <-partition.Messages():
+//			log.Printf("recieved message with offset %v", msg.Offset)
+
+			cc := pim.PimMessages{}
+			err := proto.Unmarshal(msg.Value, &cc)
+			if err != nil {
+				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+			}
+
+			switch x := cc.GetPimMessage().(type) {
+
+			
+			
+			case *pim.PimMessages_Product:
+				if err := translatePimProduct(c, model, msg.Offset, cc.GetProduct()); err != nil {
+					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
+				}
+			
+
+			case nil:
+				panic(fmt.Sprintf("context message is empty"))
+
+			default:
+				panic(fmt.Sprintf("unexpected type %T in oneof", x))
+			}
+
+		}
+	}
+}
+
+func (c *context) bridgeWarehouse() {
+
+	c.AwaitLastOffset()
+
+	model, free := c.read()
+	warehouseOffset := model.getWarehouseOffset()
+	free()
+	partition, err := c.consumer.ConsumePartition(warehouse.Topic, 0, warehouseOffset)
+	if err != nil {
+		log.Panicf("failed to setup kafka partition: %s", err)
+	}
+
+	log.Printf("starting bridge %v", Topic)
+
+	for {
+		select {
+		case err := <-partition.Errors():
+			log.Printf("failure from kafka consumer: %s", err)
+
+		case msg := <-partition.Messages():
+//			log.Printf("recieved message with offset %v", msg.Offset)
+
+			cc := warehouse.WarehouseMessages{}
+			err := proto.Unmarshal(msg.Value, &cc)
+			if err != nil {
+				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+			}
+
+			switch x := cc.GetWarehouseMessage().(type) {
+
+			
+			
+			case *warehouse.WarehouseMessages_StockCorrected:
+				if err := translateWarehouseStockCorrected(c, model, msg.Offset, cc.GetStockCorrected()); err != nil {
+					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
+				}
+			
+
+			case nil:
+				panic(fmt.Sprintf("context message is empty"))
+
+			default:
+				panic(fmt.Sprintf("unexpected type %T in oneof", x))
+			}
+
+		}
+	}
+}
+
 
 func (c *context) Start() {
 
@@ -147,6 +256,10 @@ func (c *context) Start() {
 	}
 
 
+		go c.bridgePim()
+
+		go c.bridgeWarehouse()
+
 
 	for {
 		select {
@@ -159,6 +272,10 @@ func (c *context) Start() {
 
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
+			
+				c.doneChPim <- struct{}{}
+			
+				c.doneChWarehouse <- struct{}{}
 			
 			if err := partition.Close(); err != nil {
 				log.Panicf("failed to close kafka partition: %s", err)
@@ -207,8 +324,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	case *CheckoutMessages_ChangeProductQuantity:
 		return updateModelChangeProductQuantity(model, msg.Offset, cc.GetChangeProductQuantity())
 	
-	case *CheckoutMessages_Stock:
-		return updateModelStock(model, msg.Offset, cc.GetStock())
+	case *CheckoutMessages_StockCorrected:
+		return updateModelStockCorrected(model, msg.Offset, cc.GetStockCorrected())
 	
 	case *CheckoutMessages_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
@@ -228,6 +345,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 func (c *context) logChangeProductQuantity(logMsg *ChangeProductQuantity) (int32, int64, error) {
 
+	//log.Printf("logChangeProductQuantity");
+
 	change := &CheckoutMessages{
 		CheckoutMessage: &CheckoutMessages_ChangeProductQuantity{
 			ChangeProductQuantity: logMsg,
@@ -246,11 +365,13 @@ func (c *context) logChangeProductQuantity(logMsg *ChangeProductQuantity) (int32
 	return c.producer.SendMessage(msg)
 }
 
-func (c *context) logStock(logMsg *Stock) (int32, int64, error) {
+func (c *context) logStockCorrected(logMsg *StockCorrected) (int32, int64, error) {
+
+	//log.Printf("logStockCorrected");
 
 	change := &CheckoutMessages{
-		CheckoutMessage: &CheckoutMessages_Stock{
-			Stock: logMsg,
+		CheckoutMessage: &CheckoutMessages_StockCorrected{
+			StockCorrected: logMsg,
 		},
 	}
 
@@ -267,6 +388,8 @@ func (c *context) logStock(logMsg *Stock) (int32, int64, error) {
 }
 
 func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
+
+	//log.Printf("logProduct");
 
 	change := &CheckoutMessages{
 		CheckoutMessage: &CheckoutMessages_Product{
@@ -287,6 +410,8 @@ func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 }
 
 func (c *context) logOrderCart(logMsg *OrderCart) (int32, int64, error) {
+
+	//log.Printf("logOrderCart");
 
 	change := &CheckoutMessages{
 		CheckoutMessage: &CheckoutMessages_OrderCart{
