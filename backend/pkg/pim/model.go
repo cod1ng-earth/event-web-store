@@ -1,5 +1,5 @@
-//go:generate sh -c "../../cmd/dev-tools/simba/simba > context.go"
-///go:generate gofmt -s w context.go
+//go:generate ../../cmd/dev-tools/simba/simba
+//go:generate gofmt -s -w context.go
 //go:generate protoc --go_out=. pim.proto
 
 package pim

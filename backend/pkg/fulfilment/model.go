@@ -1,8 +1,8 @@
-//go:generate sh -c "../../cmd/dev-tools/simba/simba > context.go"
-///go:generate gofmt -s w context.go
-//go:generate protoc --go_out=. warehouse.proto
+//go:generate ../../cmd/dev-tools/simba/simba --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/checkout
+//go:generate gofmt -s -w context.go
+//go:generate protoc --go_out=. fulfilment.proto
 
-package warehouse
+package fulfilment
 
 type model struct {
 	inventory map[string]int64

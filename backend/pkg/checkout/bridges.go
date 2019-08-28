@@ -4,15 +4,15 @@ import (
 	"log"
 
 	"github.com/cod1ng-earth/event-web-store/backend/pkg/pim"
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/warehouse"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/fulfilment"
 )
 
 func (m *model) getPimOffset() int64 {
 	return m.pimOffset
 }
 
-func (m *model) getWarehouseOffset() int64 {
-	return m.warehouseOffset
+func (m *model) getFulfilmentOffset() int64 {
+	return m.fulfilmentOffset
 }
 
 func translatePimProduct(c *context, m *model, offset int64, msg *pim.Product) error {
@@ -27,12 +27,12 @@ func translatePimProduct(c *context, m *model, offset int64, msg *pim.Product) e
 	return err
 }
 
-func translateWarehouseStockCorrected(c *context, m *model, offset int64, msg *warehouse.StockCorrected) error {
+func translateFulfilmentStockCorrected(c *context, m *model, offset int64, msg *fulfilment.StockCorrected) error {
 	log.Printf("translate stock corrected %v to checkkout", offset)
 	_, _, err := c.logStockCorrected(&StockCorrected{
 		ProductID:       msg.ProductID,
 		QuantityChange:  msg.QuantityChange,
-		WarehouseOffset: offset,
+		FulfilmentOffset: offset,
 	})
 	return err
 }

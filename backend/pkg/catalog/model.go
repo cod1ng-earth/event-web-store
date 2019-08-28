@@ -1,5 +1,5 @@
-//go:generate sh -c "../../cmd/dev-tools/simba/simba --lock=wait-free --batch --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/pim > context.go"
-///go:generate gofmt -s -w context.go
+//go:generate ../../cmd/dev-tools/simba/simba --lock=wait-free --batch --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/pim
+//go:generate gofmt -s -w context.go
 //go:generate protoc --go_out=. catalog.proto
 
 package catalog

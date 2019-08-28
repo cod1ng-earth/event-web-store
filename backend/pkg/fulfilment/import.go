@@ -1,4 +1,4 @@
-package warehouse
+package fulfilment
 
 import (
 	"encoding/csv"

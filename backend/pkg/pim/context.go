@@ -7,11 +7,8 @@ import (
 	"log"
 	"sync"
 
-
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
-
-
 )
 
 const (
@@ -20,18 +17,16 @@ const (
 )
 
 type context struct {
-	doneCh    chan struct{}
+	doneCh chan struct{}
 
-	client    sarama.Client
-	consumer  sarama.Consumer
-	producer  sarama.SyncProducer
+	client   sarama.Client
+	consumer sarama.Consumer
+	producer sarama.SyncProducer
 
 	batchOffset int64
 
-
-	model  *model
-	lock   *sync.RWMutex
-
+	model *model
+	lock  *sync.RWMutex
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -59,18 +54,16 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	batchOffset--
 
 	context := context{
-		doneCh:    make(chan struct{}, 1),
-	
-		client:    client,
-		consumer:  consumer,
-		producer:  producer,
+		doneCh: make(chan struct{}, 1),
+
+		client:   client,
+		consumer: consumer,
+		producer: producer,
 
 		batchOffset: batchOffset,
 
-	
-		model:  newModel(),
-		lock:   &sync.RWMutex{},
-	
+		model: newModel(),
+		lock:  &sync.RWMutex{},
 
 		offset:        0,
 		offsetChanged: sync.NewCond(&sync.Mutex{}),
@@ -102,21 +95,18 @@ func (c *context) AwaitLastOffset() {
 
 func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
 
-	
-
 	for {
-	
+
 		for msg := range writes {
 			applyChange(msg, c.model, c)
 		}
-	
+
 	}
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
-//	log.Printf("applying message with offset %v", msg.Offset)
-
+	//	log.Printf("applying message with offset %v", msg.Offset)
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -125,13 +115,9 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 		c.offsetChanged.Broadcast()
 	}()
 
-
-
 	updateModel(msg, m)
 
 }
-
-
 
 func (c *context) Start() {
 
@@ -145,20 +131,18 @@ func (c *context) Start() {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
 
-
-
 	for {
 		select {
 		case err := <-partition.Errors():
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-partition.Messages():
-//			log.Printf("recieved message with offset %v", msg.Offset)
+			//			log.Printf("recieved message with offset %v", msg.Offset)
 			writes <- msg
 
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
-			
+
 			if err := partition.Close(); err != nil {
 				log.Panicf("failed to close kafka partition: %s", err)
 			}
@@ -185,13 +169,10 @@ func (c *context) read() (*model, func()) {
 	}
 	c.offsetChanged.L.Unlock()
 
-
 	c.lock.RLock()
 	return c.model, c.lock.RUnlock
 
 }
-
-
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	cc := PimMessages{}
@@ -202,10 +183,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	switch x := cc.GetPimMessage().(type) {
 
-	
 	case *PimMessages_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
-	
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -214,7 +193,6 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
 }
-
 
 func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 
@@ -237,4 +215,3 @@ func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 	}
 	return c.producer.SendMessage(msg)
 }
-

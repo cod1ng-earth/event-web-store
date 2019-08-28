@@ -50,7 +50,12 @@ func main() {
 	name := path.Base(currentDir)
 
 	desc := createContextDescription(name, *batch, *readLock, *bridges)
-	renderTemplate(os.Stdout, desc)
+	f, err := os.Create("context.go")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	renderTemplate(f, desc)
 }
 
 func createContextDescription(name string, batch bool, readLock string, bridges []string) contextDescription {

@@ -57,5 +57,5 @@ message OrderCartResonse {
 message StockCorrected {
     string productID = 1;
     int64 quantityChange = 2;
-    int64 warehouseOffset = 3;
+    int64 fulfilmentOffset = 3;
 }

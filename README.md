@@ -74,6 +74,8 @@ backend
   - [DONE] processing: batch & finalize vs single-step
   - batch only during start vs dynamic selection
   - [DONE] sync to other contexts before processing commands
+  - protobuf vs json
+  - generate request & response & presenter & view_model for http endpoints // https://youtu.be/WpkDN78P884?t=2218
 - extend simba to create bridges
   - share events between contexts
 - CORS

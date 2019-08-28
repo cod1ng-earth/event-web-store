@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package warehouse;
+package fulfilment;
 
-message WarehouseMessages {
-    oneof warehouseMessage {
+message FulfilmentMessages {
+    oneof fulfilmentMessage {
         StockCorrected stockCorrected = 1;
     }
 }

@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/Shopify/sarama"
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/warehouse"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/fulfilment"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -29,14 +29,14 @@ func main() {
 		log.Printf("import file = %s", *currentPath)
 	}
 
-	warehouse := warehouse.NewContext(brokerList, config)
-	go warehouse.Start()
-	defer warehouse.Stop()
-	warehouse.AwaitLastOffset()
+	fulfilment := fulfilment.NewContext(brokerList, config)
+	go fulfilment.Start()
+	defer fulfilment.Stop()
+	fulfilment.AwaitLastOffset()
 
 	if *verbose {
 		log.Printf("context started up")
 	}
 
-	warehouse.ImportFile(*currentPath, *verbose)
+	fulfilment.ImportFile(*currentPath, *verbose)
 }

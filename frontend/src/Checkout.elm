@@ -118,7 +118,7 @@ type alias OrderCartResonse =
 type alias StockCorrected =
     { productID : String
     , quantityChange : Int
-    , warehouseOffset : Int
+    , fulfilmentOffset : Int
     }
 
 
@@ -215,7 +215,7 @@ stockCorrectedDecoder =
     Decode.message (StockCorrected "" 0 0)
         [ Decode.optional 1 Decode.string setProductID
         , Decode.optional 2 Decode.int32 setQuantityChange
-        , Decode.optional 3 Decode.int32 setWarehouseOffset
+        , Decode.optional 3 Decode.int32 setFulfilmentOffset
         ]
 
 
@@ -322,7 +322,7 @@ toStockCorrectedEncoder model =
     Encode.message
         [ ( 1, Encode.string model.productID )
         , ( 2, Encode.int32 model.quantityChange )
-        , ( 3, Encode.int32 model.warehouseOffset )
+        , ( 3, Encode.int32 model.fulfilmentOffset )
         ]
 
 
@@ -400,6 +400,6 @@ setQuantityChange value model =
     { model | quantityChange = value }
 
 
-setWarehouseOffset : a -> { b | warehouseOffset : a } -> { b | warehouseOffset : a }
-setWarehouseOffset value model =
-    { model | warehouseOffset = value }
+setFulfilmentOffset : a -> { b | fulfilmentOffset : a } -> { b | fulfilmentOffset : a }
+setFulfilmentOffset value model =
+    { model | fulfilmentOffset = value }

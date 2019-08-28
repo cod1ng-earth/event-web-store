@@ -7,15 +7,12 @@ import (
 	"log"
 	"sync"
 
-
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 
-
 	"github.com/cod1ng-earth/event-web-store/backend/pkg/pim"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/warehouse"
-
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/fulfilment"
 )
 
 const (
@@ -24,22 +21,20 @@ const (
 )
 
 type context struct {
-	doneCh    chan struct{}
+	doneCh chan struct{}
 
-	doneChPim    chan struct{}
+	doneChPim chan struct{}
 
-	doneChWarehouse    chan struct{}
+	doneChFulfilment chan struct{}
 
-	client    sarama.Client
-	consumer  sarama.Consumer
-	producer  sarama.SyncProducer
+	client   sarama.Client
+	consumer sarama.Consumer
+	producer sarama.SyncProducer
 
 	batchOffset int64
 
-
-	model  *model
-	lock   *sync.RWMutex
-
+	model *model
+	lock  *sync.RWMutex
 
 	offset        int64
 	offsetChanged *sync.Cond
@@ -67,22 +62,20 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	batchOffset--
 
 	context := context{
-		doneCh:    make(chan struct{}, 1),
-	
+		doneCh: make(chan struct{}, 1),
+
 		doneChPim: make(chan struct{}, 1),
-	
-		doneChWarehouse: make(chan struct{}, 1),
-	
-		client:    client,
-		consumer:  consumer,
-		producer:  producer,
+
+		doneChFulfilment: make(chan struct{}, 1),
+
+		client:   client,
+		consumer: consumer,
+		producer: producer,
 
 		batchOffset: batchOffset,
 
-	
-		model:  newModel(),
-		lock:   &sync.RWMutex{},
-	
+		model: newModel(),
+		lock:  &sync.RWMutex{},
 
 		offset:        0,
 		offsetChanged: sync.NewCond(&sync.Mutex{}),
@@ -114,21 +107,18 @@ func (c *context) AwaitLastOffset() {
 
 func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
 
-	
-
 	for {
-	
+
 		for msg := range writes {
 			applyChange(msg, c.model, c)
 		}
-	
+
 	}
 }
 
 func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
-//	log.Printf("applying message with offset %v", msg.Offset)
-
+	//	log.Printf("applying message with offset %v", msg.Offset)
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -137,12 +127,9 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 		c.offsetChanged.Broadcast()
 	}()
 
-
-
 	updateModel(msg, m)
 
 }
-
 
 func (c *context) bridgePim() {
 
@@ -164,7 +151,7 @@ func (c *context) bridgePim() {
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-partition.Messages():
-//			log.Printf("recieved message with offset %v", msg.Offset)
+			//			log.Printf("recieved message with offset %v", msg.Offset)
 
 			cc := pim.PimMessages{}
 			err := proto.Unmarshal(msg.Value, &cc)
@@ -174,13 +161,10 @@ func (c *context) bridgePim() {
 
 			switch x := cc.GetPimMessage().(type) {
 
-			
-			
 			case *pim.PimMessages_Product:
 				if err := translatePimProduct(c, model, msg.Offset, cc.GetProduct()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
-			
 
 			case nil:
 				panic(fmt.Sprintf("context message is empty"))
@@ -193,14 +177,14 @@ func (c *context) bridgePim() {
 	}
 }
 
-func (c *context) bridgeWarehouse() {
+func (c *context) bridgeFulfilment() {
 
 	c.AwaitLastOffset()
 
 	model, free := c.read()
-	warehouseOffset := model.getWarehouseOffset()
+	fulfilmentOffset := model.getFulfilmentOffset()
 	free()
-	partition, err := c.consumer.ConsumePartition(warehouse.Topic, 0, warehouseOffset)
+	partition, err := c.consumer.ConsumePartition(fulfilment.Topic, 0, fulfilmentOffset)
 	if err != nil {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
@@ -213,23 +197,20 @@ func (c *context) bridgeWarehouse() {
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-partition.Messages():
-//			log.Printf("recieved message with offset %v", msg.Offset)
+			//			log.Printf("recieved message with offset %v", msg.Offset)
 
-			cc := warehouse.WarehouseMessages{}
+			cc := fulfilment.FulfilmentMessages{}
 			err := proto.Unmarshal(msg.Value, &cc)
 			if err != nil {
 				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 			}
 
-			switch x := cc.GetWarehouseMessage().(type) {
+			switch x := cc.GetFulfilmentMessage().(type) {
 
-			
-			
-			case *warehouse.WarehouseMessages_StockCorrected:
-				if err := translateWarehouseStockCorrected(c, model, msg.Offset, cc.GetStockCorrected()); err != nil {
+			case *fulfilment.FulfilmentMessages_StockCorrected:
+				if err := translateFulfilmentStockCorrected(c, model, msg.Offset, cc.GetStockCorrected()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
-			
 
 			case nil:
 				panic(fmt.Sprintf("context message is empty"))
@@ -241,7 +222,6 @@ func (c *context) bridgeWarehouse() {
 		}
 	}
 }
-
 
 func (c *context) Start() {
 
@@ -255,11 +235,9 @@ func (c *context) Start() {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
 
+	go c.bridgePim()
 
-		go c.bridgePim()
-
-		go c.bridgeWarehouse()
-
+	go c.bridgeFulfilment()
 
 	for {
 		select {
@@ -267,16 +245,16 @@ func (c *context) Start() {
 			log.Printf("failure from kafka consumer: %s", err)
 
 		case msg := <-partition.Messages():
-//			log.Printf("recieved message with offset %v", msg.Offset)
+			//			log.Printf("recieved message with offset %v", msg.Offset)
 			writes <- msg
 
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
-			
-				c.doneChPim <- struct{}{}
-			
-				c.doneChWarehouse <- struct{}{}
-			
+
+			c.doneChPim <- struct{}{}
+
+			c.doneChFulfilment <- struct{}{}
+
 			if err := partition.Close(); err != nil {
 				log.Panicf("failed to close kafka partition: %s", err)
 			}
@@ -303,13 +281,10 @@ func (c *context) read() (*model, func()) {
 	}
 	c.offsetChanged.L.Unlock()
 
-
 	c.lock.RLock()
 	return c.model, c.lock.RUnlock
 
 }
-
-
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	cc := CheckoutMessages{}
@@ -320,19 +295,17 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	switch x := cc.GetCheckoutMessage().(type) {
 
-	
 	case *CheckoutMessages_ChangeProductQuantity:
 		return updateModelChangeProductQuantity(model, msg.Offset, cc.GetChangeProductQuantity())
-	
+
 	case *CheckoutMessages_StockCorrected:
 		return updateModelStockCorrected(model, msg.Offset, cc.GetStockCorrected())
-	
+
 	case *CheckoutMessages_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
-	
+
 	case *CheckoutMessages_OrderCart:
 		return updateModelOrderCart(model, msg.Offset, cc.GetOrderCart())
-	
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -341,7 +314,6 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
 }
-
 
 func (c *context) logChangeProductQuantity(logMsg *ChangeProductQuantity) (int32, int64, error) {
 
@@ -430,4 +402,3 @@ func (c *context) logOrderCart(logMsg *OrderCart) (int32, int64, error) {
 	}
 	return c.producer.SendMessage(msg)
 }
-
