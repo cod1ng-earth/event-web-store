@@ -2,9 +2,9 @@
 
 
 module Checkout exposing
-    ( CheckoutMessage(..), CheckoutMessages, Product, Cart, Position, ChangeProductQuantity, OrderCart, OrderCartResonse, StockCorrected
-    , checkoutMessagesDecoder, productDecoder, cartDecoder, positionDecoder, changeProductQuantityDecoder, orderCartDecoder, orderCartResonseDecoder, stockCorrectedDecoder
-    , toCheckoutMessagesEncoder, toProductEncoder, toCartEncoder, toPositionEncoder, toChangeProductQuantityEncoder, toOrderCartEncoder, toOrderCartResonseEncoder, toStockCorrectedEncoder
+    ( Cart, Position, OrderCartResonse
+    , cartDecoder, positionDecoder, orderCartResonseDecoder
+    , toCartEncoder, toPositionEncoder, toOrderCartResonseEncoder
     )
 
 {-| ProtoBuf module: `Checkout`
@@ -13,24 +13,24 @@ This module was generated automatically using
 
   - [`protoc-gen-elm`](https://www.npmjs.com/package/protoc-gen-elm) 1.0.0-beta-2
   - `protoc` 3.6.1
-  - the following specification file: `checkout.proto`
+  - the following specification file: `api.proto`
 
 To run it use [`elm-protocol-buffers`](https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/1.1.0) version 1.1.0 or higher.
 
 
 # Model
 
-@docs CheckoutMessage, CheckoutMessages, Product, Cart, Position, ChangeProductQuantity, OrderCart, OrderCartResonse, StockCorrected
+@docs Cart, Position, OrderCartResonse
 
 
 # Decoder
 
-@docs checkoutMessagesDecoder, productDecoder, cartDecoder, positionDecoder, changeProductQuantityDecoder, orderCartDecoder, orderCartResonseDecoder, stockCorrectedDecoder
+@docs cartDecoder, positionDecoder, orderCartResonseDecoder
 
 
 # Encoder
 
-@docs toCheckoutMessagesEncoder, toProductEncoder, toCartEncoder, toPositionEncoder, toChangeProductQuantityEncoder, toOrderCartEncoder, toOrderCartResonseEncoder, toStockCorrectedEncoder
+@docs toCartEncoder, toPositionEncoder, toOrderCartResonseEncoder
 
 -}
 
@@ -40,33 +40,6 @@ import Protobuf.Encode as Encode
 
 
 -- MODEL
-
-
-{-| CheckoutMessage
--}
-type CheckoutMessage
-    = CheckoutMessageChangeProductQuantity ChangeProductQuantity
-    | CheckoutMessageStockCorrected StockCorrected
-    | CheckoutMessageProduct Product
-    | CheckoutMessageOrderCart OrderCart
-
-
-{-| `CheckoutMessages` message
--}
-type alias CheckoutMessages =
-    { checkoutMessage : Maybe CheckoutMessage
-    }
-
-
-{-| `Product` message
--}
-type alias Product =
-    { productID : String
-    , price : Int
-    , name : String
-    , smallImageURL : String
-    , pimOffset : Int
-    }
 
 
 {-| `Cart` message
@@ -90,22 +63,6 @@ type alias Position =
     }
 
 
-{-| `ChangeProductQuantity` message
--}
-type alias ChangeProductQuantity =
-    { cartID : String
-    , productID : String
-    , quantity : Int
-    }
-
-
-{-| `OrderCart` message
--}
-type alias OrderCart =
-    { cartID : String
-    }
-
-
 {-| `OrderCartResonse` message
 -}
 type alias OrderCartResonse =
@@ -113,45 +70,8 @@ type alias OrderCartResonse =
     }
 
 
-{-| `StockCorrected` message
--}
-type alias StockCorrected =
-    { productID : String
-    , quantityChange : Int
-    , fulfilmentOffset : Int
-    }
-
-
 
 -- DECODER
-
-
-{-| `CheckoutMessages` decoder
--}
-checkoutMessagesDecoder : Decode.Decoder CheckoutMessages
-checkoutMessagesDecoder =
-    Decode.message (CheckoutMessages Nothing)
-        [ Decode.oneOf
-            [ ( 1, Decode.map CheckoutMessageChangeProductQuantity changeProductQuantityDecoder )
-            , ( 2, Decode.map CheckoutMessageStockCorrected stockCorrectedDecoder )
-            , ( 3, Decode.map CheckoutMessageProduct productDecoder )
-            , ( 4, Decode.map CheckoutMessageOrderCart orderCartDecoder )
-            ]
-            setCheckoutMessage
-        ]
-
-
-{-| `Product` decoder
--}
-productDecoder : Decode.Decoder Product
-productDecoder =
-    Decode.message (Product "" 0 "" "" 0)
-        [ Decode.optional 1 Decode.string setProductID
-        , Decode.optional 2 Decode.int32 setPrice
-        , Decode.optional 3 Decode.string setName
-        , Decode.optional 4 Decode.string setSmallImageURL
-        , Decode.optional 5 Decode.int32 setPimOffset
-        ]
 
 
 {-| `Cart` decoder
@@ -179,26 +99,6 @@ positionDecoder =
         ]
 
 
-{-| `ChangeProductQuantity` decoder
--}
-changeProductQuantityDecoder : Decode.Decoder ChangeProductQuantity
-changeProductQuantityDecoder =
-    Decode.message (ChangeProductQuantity "" "" 0)
-        [ Decode.optional 3 Decode.string setCartID
-        , Decode.optional 1 Decode.string setProductID
-        , Decode.optional 2 Decode.int32 setQuantity
-        ]
-
-
-{-| `OrderCart` decoder
--}
-orderCartDecoder : Decode.Decoder OrderCart
-orderCartDecoder =
-    Decode.message (OrderCart "")
-        [ Decode.optional 1 Decode.string setCartID
-        ]
-
-
 {-| `OrderCartResonse` decoder
 -}
 orderCartResonseDecoder : Decode.Decoder OrderCartResonse
@@ -208,57 +108,8 @@ orderCartResonseDecoder =
         ]
 
 
-{-| `StockCorrected` decoder
--}
-stockCorrectedDecoder : Decode.Decoder StockCorrected
-stockCorrectedDecoder =
-    Decode.message (StockCorrected "" 0 0)
-        [ Decode.optional 1 Decode.string setProductID
-        , Decode.optional 2 Decode.int32 setQuantityChange
-        , Decode.optional 3 Decode.int32 setFulfilmentOffset
-        ]
-
-
 
 -- ENCODER
-
-
-toCheckoutMessageEncoder : CheckoutMessage -> ( Int, Encode.Encoder )
-toCheckoutMessageEncoder model =
-    case model of
-        CheckoutMessageChangeProductQuantity value ->
-            ( 1, toChangeProductQuantityEncoder value )
-
-        CheckoutMessageStockCorrected value ->
-            ( 2, toStockCorrectedEncoder value )
-
-        CheckoutMessageProduct value ->
-            ( 3, toProductEncoder value )
-
-        CheckoutMessageOrderCart value ->
-            ( 4, toOrderCartEncoder value )
-
-
-{-| `CheckoutMessages` encoder
--}
-toCheckoutMessagesEncoder : CheckoutMessages -> Encode.Encoder
-toCheckoutMessagesEncoder model =
-    Encode.message
-        [ Maybe.withDefault ( 0, Encode.none ) <| Maybe.map toCheckoutMessageEncoder model.checkoutMessage
-        ]
-
-
-{-| `Product` encoder
--}
-toProductEncoder : Product -> Encode.Encoder
-toProductEncoder model =
-    Encode.message
-        [ ( 1, Encode.string model.productID )
-        , ( 2, Encode.int32 model.price )
-        , ( 3, Encode.string model.name )
-        , ( 4, Encode.string model.smallImageURL )
-        , ( 5, Encode.int32 model.pimOffset )
-        ]
 
 
 {-| `Cart` encoder
@@ -286,26 +137,6 @@ toPositionEncoder model =
         ]
 
 
-{-| `ChangeProductQuantity` encoder
--}
-toChangeProductQuantityEncoder : ChangeProductQuantity -> Encode.Encoder
-toChangeProductQuantityEncoder model =
-    Encode.message
-        [ ( 3, Encode.string model.cartID )
-        , ( 1, Encode.string model.productID )
-        , ( 2, Encode.int32 model.quantity )
-        ]
-
-
-{-| `OrderCart` encoder
--}
-toOrderCartEncoder : OrderCart -> Encode.Encoder
-toOrderCartEncoder model =
-    Encode.message
-        [ ( 1, Encode.string model.cartID )
-        ]
-
-
 {-| `OrderCartResonse` encoder
 -}
 toOrderCartResonseEncoder : OrderCartResonse -> Encode.Encoder
@@ -315,24 +146,18 @@ toOrderCartResonseEncoder model =
         ]
 
 
-{-| `StockCorrected` encoder
--}
-toStockCorrectedEncoder : StockCorrected -> Encode.Encoder
-toStockCorrectedEncoder model =
-    Encode.message
-        [ ( 1, Encode.string model.productID )
-        , ( 2, Encode.int32 model.quantityChange )
-        , ( 3, Encode.int32 model.fulfilmentOffset )
-        ]
-
-
 
 -- SETTERS
 
 
-setCheckoutMessage : a -> { b | checkoutMessage : a } -> { b | checkoutMessage : a }
-setCheckoutMessage value model =
-    { model | checkoutMessage = value }
+setId : a -> { b | id : a } -> { b | id : a }
+setId value model =
+    { model | id = value }
+
+
+setPositions : a -> { b | positions : a } -> { b | positions : a }
+setPositions value model =
+    { model | positions = value }
 
 
 setProductID : a -> { b | productID : a } -> { b | productID : a }
@@ -355,21 +180,6 @@ setSmallImageURL value model =
     { model | smallImageURL = value }
 
 
-setPimOffset : a -> { b | pimOffset : a } -> { b | pimOffset : a }
-setPimOffset value model =
-    { model | pimOffset = value }
-
-
-setId : a -> { b | id : a } -> { b | id : a }
-setId value model =
-    { model | id = value }
-
-
-setPositions : a -> { b | positions : a } -> { b | positions : a }
-setPositions value model =
-    { model | positions = value }
-
-
 setQuantity : a -> { b | quantity : a } -> { b | quantity : a }
 setQuantity value model =
     { model | quantity = value }
@@ -385,21 +195,6 @@ setMoreInStock value model =
     { model | moreInStock = value }
 
 
-setCartID : a -> { b | cartID : a } -> { b | cartID : a }
-setCartID value model =
-    { model | cartID = value }
-
-
 setSuccessful : a -> { b | successful : a } -> { b | successful : a }
 setSuccessful value model =
     { model | successful = value }
-
-
-setQuantityChange : a -> { b | quantityChange : a } -> { b | quantityChange : a }
-setQuantityChange value model =
-    { model | quantityChange = value }
-
-
-setFulfilmentOffset : a -> { b | fulfilmentOffset : a } -> { b | fulfilmentOffset : a }
-setFulfilmentOffset value model =
-    { model | fulfilmentOffset = value }

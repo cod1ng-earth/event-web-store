@@ -320,8 +320,8 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	switch x := cc.GetCatalogMessage().(type) {
 
-	case *CatalogMessages_PimProduct:
-		return batchUpdateModelPimProduct(model, msg.Offset, cc.GetPimProduct())
+	case *CatalogMessages_Product:
+		return batchUpdateModelProduct(model, msg.Offset, cc.GetProduct())
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -340,8 +340,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	switch x := cc.GetCatalogMessage().(type) {
 
-	case *CatalogMessages_PimProduct:
-		return updateModelPimProduct(model, msg.Offset, cc.GetPimProduct())
+	case *CatalogMessages_Product:
+		return updateModelProduct(model, msg.Offset, cc.GetProduct())
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -351,13 +351,13 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	}
 }
 
-func (c *context) logPimProduct(logMsg *PimProduct) (int32, int64, error) {
+func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 
-	//log.Printf("logPimProduct");
+	//log.Printf("logProduct");
 
 	change := &CatalogMessages{
-		CatalogMessage: &CatalogMessages_PimProduct{
-			PimProduct: logMsg,
+		CatalogMessage: &CatalogMessages_Product{
+			Product: logMsg,
 		},
 	}
 

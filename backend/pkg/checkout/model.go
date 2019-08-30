@@ -1,6 +1,7 @@
 //go:generate ../../cmd/dev-tools/simba/simba --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/pim --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/fulfilment
 //go:generate gofmt -s -w context.go
-//go:generate protoc --go_out=. checkout.proto
+//go:generate protoc --go_out=. topic.proto
+//go:generate protoc --go_out=. api.proto
 
 package checkout
 

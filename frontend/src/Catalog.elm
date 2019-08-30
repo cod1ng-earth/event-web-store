@@ -2,9 +2,9 @@
 
 
 module Catalog exposing
-    ( CatalogMessage(..), CatalogMessages, CatalogPage, Product, PimProduct
-    , catalogMessagesDecoder, catalogPageDecoder, productDecoder, pimProductDecoder
-    , toCatalogMessagesEncoder, toCatalogPageEncoder, toProductEncoder, toPimProductEncoder
+    ( CatalogRequestSorting(..), CatalogRequest, CatalogResponse, ProductRequest, ProductResponse
+    , catalogRequestDecoder, catalogResponseDecoder, productRequestDecoder, productResponseDecoder
+    , toCatalogRequestEncoder, toCatalogResponseEncoder, toProductRequestEncoder, toProductResponseEncoder
     )
 
 {-| ProtoBuf module: `Catalog`
@@ -13,24 +13,24 @@ This module was generated automatically using
 
   - [`protoc-gen-elm`](https://www.npmjs.com/package/protoc-gen-elm) 1.0.0-beta-2
   - `protoc` 3.6.1
-  - the following specification file: `catalog.proto`
+  - the following specification file: `api.proto`
 
 To run it use [`elm-protocol-buffers`](https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/1.1.0) version 1.1.0 or higher.
 
 
 # Model
 
-@docs CatalogMessage, CatalogMessages, CatalogPage, Product, PimProduct
+@docs CatalogRequestSorting, CatalogRequest, CatalogResponse, ProductRequest, ProductResponse
 
 
 # Decoder
 
-@docs catalogMessagesDecoder, catalogPageDecoder, productDecoder, pimProductDecoder
+@docs catalogRequestDecoder, catalogResponseDecoder, productRequestDecoder, productResponseDecoder
 
 
 # Encoder
 
-@docs toCatalogMessagesEncoder, toCatalogPageEncoder, toProductEncoder, toPimProductEncoder
+@docs toCatalogRequestEncoder, toCatalogResponseEncoder, toProductRequestEncoder, toProductResponseEncoder
 
 -}
 
@@ -42,51 +42,45 @@ import Protobuf.Encode as Encode
 -- MODEL
 
 
-{-| CatalogMessage
+{-| `CatalogRequestSorting` enumeration
 -}
-type CatalogMessage
-    = CatalogMessagePimProduct PimProduct
+type CatalogRequestSorting
+    = Id
+    | Price
+    | Name
+    | CatalogRequestSortingUnrecognized_ Int
 
 
-{-| `CatalogMessages` message
+{-| `CatalogRequest` message
 -}
-type alias CatalogMessages =
-    { catalogMessage : Maybe CatalogMessage
-    }
-
-
-{-| `CatalogPage` message
--}
-type alias CatalogPage =
-    { products : List Product
-    , totalItems : Int
-    , totalPages : Int
-    , currentPage : Int
-    , setPageTo : Int
-    , sorting : String
-    , filtering : String
+type alias CatalogRequest =
+    { sorting : CatalogRequestSorting
+    , prefix : String
+    , page : Int
     , itemsPerPage : Int
     }
 
 
-{-| `Product` message
+{-| `CatalogResponse` message
 -}
-type alias Product =
-    { id : String
-    , price : Int
-    , name : String
-    , description : String
-    , longtext : String
-    , category : String
-    , smallImageURL : String
-    , largeImageURL : String
-    , disabled : Bool
+type alias CatalogResponse =
+    { request : Maybe CatalogRequest
+    , products : List ProductResponse
+    , totalItems : Int
+    , totalPages : Int
     }
 
 
-{-| `PimProduct` message
+{-| `ProductRequest` message
 -}
-type alias PimProduct =
+type alias ProductRequest =
+    { id : String
+    }
+
+
+{-| `ProductResponse` message
+-}
+type alias ProductResponse =
     { id : String
     , price : Int
     , name : String
@@ -96,7 +90,6 @@ type alias PimProduct =
     , smallImageURL : String
     , largeImageURL : String
     , disabled : Bool
-    , pimOffset : Int
     }
 
 
@@ -104,39 +97,64 @@ type alias PimProduct =
 -- DECODER
 
 
-{-| `CatalogMessages` decoder
+catalogRequestSortingDecoder : Decode.Decoder CatalogRequestSorting
+catalogRequestSortingDecoder =
+    Decode.int32
+        |> Decode.map
+            (\value ->
+                case value of
+                    0 ->
+                        Id
+
+                    1 ->
+                        Price
+
+                    2 ->
+                        Name
+
+                    v ->
+                        CatalogRequestSortingUnrecognized_ v
+            )
+
+
+{-| `CatalogRequest` decoder
 -}
-catalogMessagesDecoder : Decode.Decoder CatalogMessages
-catalogMessagesDecoder =
-    Decode.message (CatalogMessages Nothing)
-        [ Decode.oneOf
-            [ ( 1, Decode.map CatalogMessagePimProduct pimProductDecoder )
-            ]
-            setCatalogMessage
+catalogRequestDecoder : Decode.Decoder CatalogRequest
+catalogRequestDecoder =
+    Decode.message (CatalogRequest Id "" 0 0)
+        [ Decode.optional 1 catalogRequestSortingDecoder setSorting
+        , Decode.optional 2 Decode.string setPrefix
+        , Decode.optional 3 Decode.int32 setPage
+        , Decode.optional 4 Decode.int32 setItemsPerPage
         ]
 
 
-{-| `CatalogPage` decoder
+{-| `CatalogResponse` decoder
 -}
-catalogPageDecoder : Decode.Decoder CatalogPage
-catalogPageDecoder =
-    Decode.message (CatalogPage [] 0 0 0 0 "" "" 0)
-        [ Decode.repeated 1 productDecoder .products setProducts
+catalogResponseDecoder : Decode.Decoder CatalogResponse
+catalogResponseDecoder =
+    Decode.message (CatalogResponse Nothing [] 0 0)
+        [ Decode.optional 1 (Decode.map Just catalogRequestDecoder) setRequest
+        , Decode.repeated 9 productResponseDecoder .products setProducts
         , Decode.optional 2 Decode.int32 setTotalItems
         , Decode.optional 3 Decode.int32 setTotalPages
-        , Decode.optional 4 Decode.int32 setCurrentPage
-        , Decode.optional 5 Decode.int32 setSetPageTo
-        , Decode.optional 6 Decode.string setSorting
-        , Decode.optional 7 Decode.string setFiltering
-        , Decode.optional 8 Decode.int32 setItemsPerPage
         ]
 
 
-{-| `Product` decoder
+{-| `ProductRequest` decoder
 -}
-productDecoder : Decode.Decoder Product
-productDecoder =
-    Decode.message (Product "" 0 "" "" "" "" "" "" False)
+productRequestDecoder : Decode.Decoder ProductRequest
+productRequestDecoder =
+    Decode.message (ProductRequest "")
+        [ Decode.optional 1 Decode.string setId
+        ]
+
+
+{-| `ProductResponse` decoder
+-}
+productResponseDecoder : Decode.Decoder ProductResponse
+productResponseDecoder =
+    Decode.message (ProductResponse "" 0 "" "" "" "" "" "" False)
         [ Decode.optional 1 Decode.string setId
         , Decode.optional 2 Decode.int32 setPrice
         , Decode.optional 3 Decode.string setName
@@ -146,24 +164,6 @@ productDecoder =
         , Decode.optional 7 Decode.string setSmallImageURL
         , Decode.optional 8 Decode.string setLargeImageURL
         , Decode.optional 9 Decode.bool setDisabled
-        ]
-
-
-{-| `PimProduct` decoder
--}
-pimProductDecoder : Decode.Decoder PimProduct
-pimProductDecoder =
-    Decode.message (PimProduct "" 0 "" "" "" "" "" "" False 0)
-        [ Decode.optional 1 Decode.string setId
-        , Decode.optional 2 Decode.int32 setPrice
-        , Decode.optional 3 Decode.string setName
-        , Decode.optional 4 Decode.string setDescription
-        , Decode.optional 5 Decode.string setLongtext
-        , Decode.optional 6 Decode.string setCategory
-        , Decode.optional 7 Decode.string setSmallImageURL
-        , Decode.optional 8 Decode.string setLargeImageURL
-        , Decode.optional 9 Decode.bool setDisabled
-        , Decode.optional 10 Decode.int32 setPimOffset
         ]
 
 
@@ -171,42 +171,60 @@ pimProductDecoder =
 -- ENCODER
 
 
-toCatalogMessageEncoder : CatalogMessage -> ( Int, Encode.Encoder )
-toCatalogMessageEncoder model =
-    case model of
-        CatalogMessagePimProduct value ->
-            ( 1, toPimProductEncoder value )
+toCatalogRequestSortingEncoder : CatalogRequestSorting -> Encode.Encoder
+toCatalogRequestSortingEncoder value =
+    Encode.int32 <|
+        case value of
+            Id ->
+                0
+
+            Price ->
+                1
+
+            Name ->
+                2
+
+            CatalogRequestSortingUnrecognized_ v ->
+                v
 
 
-{-| `CatalogMessages` encoder
+{-| `CatalogRequest` encoder
 -}
-toCatalogMessagesEncoder : CatalogMessages -> Encode.Encoder
-toCatalogMessagesEncoder model =
+toCatalogRequestEncoder : CatalogRequest -> Encode.Encoder
+toCatalogRequestEncoder model =
     Encode.message
-        [ Maybe.withDefault ( 0, Encode.none ) <| Maybe.map toCatalogMessageEncoder model.catalogMessage
+        [ ( 1, toCatalogRequestSortingEncoder model.sorting )
+        , ( 2, Encode.string model.prefix )
+        , ( 3, Encode.int32 model.page )
+        , ( 4, Encode.int32 model.itemsPerPage )
         ]
 
 
-{-| `CatalogPage` encoder
+{-| `CatalogResponse` encoder
 -}
-toCatalogPageEncoder : CatalogPage -> Encode.Encoder
-toCatalogPageEncoder model =
+toCatalogResponseEncoder : CatalogResponse -> Encode.Encoder
+toCatalogResponseEncoder model =
     Encode.message
-        [ ( 1, Encode.list toProductEncoder model.products )
+        [ ( 1, (Maybe.withDefault Encode.none << Maybe.map toCatalogRequestEncoder) model.request )
+        , ( 9, Encode.list toProductResponseEncoder model.products )
         , ( 2, Encode.int32 model.totalItems )
         , ( 3, Encode.int32 model.totalPages )
-        , ( 4, Encode.int32 model.currentPage )
-        , ( 5, Encode.int32 model.setPageTo )
-        , ( 6, Encode.string model.sorting )
-        , ( 7, Encode.string model.filtering )
-        , ( 8, Encode.int32 model.itemsPerPage )
         ]
 
 
-{-| `Product` encoder
+{-| `ProductRequest` encoder
 -}
-toProductEncoder : Product -> Encode.Encoder
-toProductEncoder model =
+toProductRequestEncoder : ProductRequest -> Encode.Encoder
+toProductRequestEncoder model =
+    Encode.message
+        [ ( 1, Encode.string model.id )
+        ]
+
+
+{-| `ProductResponse` encoder
+-}
+toProductResponseEncoder : ProductResponse -> Encode.Encoder
+toProductResponseEncoder model =
     Encode.message
         [ ( 1, Encode.string model.id )
         , ( 2, Encode.int32 model.price )
@@ -217,24 +235,6 @@ toProductEncoder model =
         , ( 7, Encode.string model.smallImageURL )
         , ( 8, Encode.string model.largeImageURL )
         , ( 9, Encode.bool model.disabled )
-        ]
-
-
-{-| `PimProduct` encoder
--}
-toPimProductEncoder : PimProduct -> Encode.Encoder
-toPimProductEncoder model =
-    Encode.message
-        [ ( 1, Encode.string model.id )
-        , ( 2, Encode.int32 model.price )
-        , ( 3, Encode.string model.name )
-        , ( 4, Encode.string model.description )
-        , ( 5, Encode.string model.longtext )
-        , ( 6, Encode.string model.category )
-        , ( 7, Encode.string model.smallImageURL )
-        , ( 8, Encode.string model.largeImageURL )
-        , ( 9, Encode.bool model.disabled )
-        , ( 10, Encode.int32 model.pimOffset )
         ]
 
 
@@ -242,9 +242,29 @@ toPimProductEncoder model =
 -- SETTERS
 
 
-setCatalogMessage : a -> { b | catalogMessage : a } -> { b | catalogMessage : a }
-setCatalogMessage value model =
-    { model | catalogMessage = value }
+setSorting : a -> { b | sorting : a } -> { b | sorting : a }
+setSorting value model =
+    { model | sorting = value }
+
+
+setPrefix : a -> { b | prefix : a } -> { b | prefix : a }
+setPrefix value model =
+    { model | prefix = value }
+
+
+setPage : a -> { b | page : a } -> { b | page : a }
+setPage value model =
+    { model | page = value }
+
+
+setItemsPerPage : a -> { b | itemsPerPage : a } -> { b | itemsPerPage : a }
+setItemsPerPage value model =
+    { model | itemsPerPage = value }
+
+
+setRequest : a -> { b | request : a } -> { b | request : a }
+setRequest value model =
+    { model | request = value }
 
 
 setProducts : a -> { b | products : a } -> { b | products : a }
@@ -260,31 +280,6 @@ setTotalItems value model =
 setTotalPages : a -> { b | totalPages : a } -> { b | totalPages : a }
 setTotalPages value model =
     { model | totalPages = value }
-
-
-setCurrentPage : a -> { b | currentPage : a } -> { b | currentPage : a }
-setCurrentPage value model =
-    { model | currentPage = value }
-
-
-setSetPageTo : a -> { b | setPageTo : a } -> { b | setPageTo : a }
-setSetPageTo value model =
-    { model | setPageTo = value }
-
-
-setSorting : a -> { b | sorting : a } -> { b | sorting : a }
-setSorting value model =
-    { model | sorting = value }
-
-
-setFiltering : a -> { b | filtering : a } -> { b | filtering : a }
-setFiltering value model =
-    { model | filtering = value }
-
-
-setItemsPerPage : a -> { b | itemsPerPage : a } -> { b | itemsPerPage : a }
-setItemsPerPage value model =
-    { model | itemsPerPage = value }
 
 
 setId : a -> { b | id : a } -> { b | id : a }
@@ -330,8 +325,3 @@ setLargeImageURL value model =
 setDisabled : a -> { b | disabled : a } -> { b | disabled : a }
 setDisabled value model =
     { model | disabled = value }
-
-
-setPimOffset : a -> { b | pimOffset : a } -> { b | pimOffset : a }
-setPimOffset value model =
-    { model | pimOffset = value }

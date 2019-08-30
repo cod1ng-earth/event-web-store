@@ -92,7 +92,7 @@ func createContextDescription(name string, batch bool, readLock string, bridges 
 }
 
 func findMessageNames(name string) ([]string, bool) {
-	reader, err := os.Open(filepath.Join("..", name, name+".proto"))
+	reader, err := os.Open(filepath.Join("..", name, "topic.proto"))
 	if err != nil {
 		log.Printf("failed to read proto file: %s", err)
 		os.Exit(1)

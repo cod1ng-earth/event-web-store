@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-package fulfilment;
-
 message FulfilmentMessages {
     oneof fulfilmentMessage {
         StockCorrected stockCorrected = 1;

@@ -1,6 +1,6 @@
 //go:generate ../../cmd/dev-tools/simba/simba
 //go:generate gofmt -s -w context.go
-//go:generate protoc --go_out=. pim.proto
+//go:generate protoc --go_out=. topic.proto
 
 package pim
 
