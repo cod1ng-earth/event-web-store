@@ -1,6 +1,7 @@
 
 codegen: frontend/src/Catalog.elm frontend/src/Checkout.elm backend/cmd/dev-tools/simba/simba
-	find . -not -path ./backend/vendor -name '*.go' | xargs -L 1 go generate
+#	find . -not -path ./backend/vendor -name '*.go' | xargs -L 1 go generate
+	cd backend && ./cmd/dev-tools/simba
 
 backend/cmd/dev-tools/simba/simba: backend/cmd/dev-tools/simba/context.go.tpl backend/cmd/dev-tools/simba/main.go
 	cd backend/cmd/dev-tools/simba && go generate && go build

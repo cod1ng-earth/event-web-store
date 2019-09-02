@@ -1,12 +1,13 @@
 syntax = "proto3";
 
-message PimMessages {
-    oneof pimMessage {
+message TopicMessages {
+    oneof messages {
         Product product = 1;
     }
 }
 
 message Product {
+    int64 internalOffset = 99;
     string id = 1;
     int64 price = 2;
     string name = 3;

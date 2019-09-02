@@ -1,7 +1,9 @@
 syntax = "proto3";
 
-message PimMessages {
-    oneof pimMessage {
+package pim;
+
+message TopicMessages {
+    oneof messages {
         Product product = 1;
     }
 }
