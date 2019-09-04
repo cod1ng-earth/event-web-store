@@ -1,0 +1,179 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api.proto",
+    "version": "version not set"
+  },
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/catalog/page": {
+      "get": {
+        "operationId": "FetchPage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/catalogCatalogResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sorting",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "ID",
+              "PRICE",
+              "NAME"
+            ],
+            "default": "ID"
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "CatalogService"
+        ]
+      }
+    },
+    "/catalog/product": {
+      "get": {
+        "operationId": "FetchProduct",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/catalogProductResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CatalogService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "CatalogRequestSorting": {
+      "type": "string",
+      "enum": [
+        "ID",
+        "PRICE",
+        "NAME"
+      ],
+      "default": "ID"
+    },
+    "catalogCatalogRequest": {
+      "type": "object",
+      "properties": {
+        "sorting": {
+          "$ref": "#/definitions/CatalogRequestSorting"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "page": {
+          "type": "string",
+          "format": "int64"
+        },
+        "itemsPerPage": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "catalogCatalogResponse": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "#/definitions/catalogCatalogRequest"
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/catalogProductResponse"
+          }
+        },
+        "totalItems": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalPages": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "catalogProductResponse": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "longtext": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "smallImageURL": {
+          "type": "string"
+        },
+        "largeImageURL": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean",
+          "format": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -112,20 +112,3 @@ func addToCart(c *context, w http.ResponseWriter, r *http.Request, cartID string
 
 	return nil
 }
-
-func updateModelChangeProductQuantity(m *model, offset int64, cc *ChangeProductQuantity) error {
-
-	cartID := cc.CartID
-
-	if _, ok := m.carts[cartID]; !ok {
-		m.carts[cartID] = make(map[string]int64)
-	}
-
-	m.carts[cartID][cc.ProductID] = cc.Quantity
-
-	if m.carts[cartID][cc.ProductID] == 0 {
-		delete(m.carts[cartID], cc.ProductID)
-	}
-
-	return nil
-}
