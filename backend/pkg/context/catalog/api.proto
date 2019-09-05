@@ -1,0 +1,52 @@
+syntax = "proto3";
+package catalog;
+
+//import "google/api/annotations.proto";
+
+message CatalogRequest {
+    enum Sorting {
+        ID = 0;
+        PRICE = 1;
+        NAME = 2;
+    }
+    Sorting sorting = 1;
+    string prefix = 2;
+    int64 page = 3;
+    int64 itemsPerPage = 4;
+}
+
+message CatalogResponse {
+    CatalogRequest request = 1;
+    repeated ProductResponse products = 9;
+    int64 totalItems = 2;
+    int64 totalPages = 3;
+}
+
+message ProductRequest {
+    string id = 1;
+}
+
+message ProductResponse {
+    string id = 1;
+    int64 price = 2;
+    string name = 3;
+    string description = 4;
+    string longtext = 5;
+    string category = 6;
+    string smallImageURL = 7;
+    string largeImageURL = 8;
+    bool disabled = 9;
+}
+
+//service CatalogService {
+//  rpc FetchProduct(ProductRequest) returns (ProductResponse) {
+//    option (google.api.http) = {
+//      get: "/catalog/product"
+//    };
+//  }
+//  rpc FetchPage(CatalogRequest) returns (CatalogResponse) {
+//    option (google.api.http) = {
+//      get: "/catalog/page"
+//    };
+//  }
+//}

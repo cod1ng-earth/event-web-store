@@ -1,4 +1,4 @@
-//go:generate go-bindata context.go.tpl
+//go:generate go-bindata -pkg simba -nometadata -nocompress context.go.tpl
 
 package simba
 
@@ -39,33 +39,33 @@ func createContextDescription(name string, batch bool, readLock string, bridges 
 		ReadLock: readLock,
 	}
 
-	messageNames, ok := findMessageNames(name)
+	messageNames, ok := findMessageNames(filepath.Join("..", name, "topic.proto"))
 	if !ok {
 		log.Fatalf("topic wrap message not defined in proto file")
 	}
 	desc.MessageNames = messageNames
 
-	bridgeDescs := []bridgeDescription{}
+	subscribers := []subscriber{}
 	for _, bridge := range bridges {
 		name = path.Base(bridge)
-		messageNames, ok := findMessageNames(name)
+		messageNames, ok := findMessageNames(filepath.Join("..", name, "published", "topic.proto"))
 		if !ok {
 			log.Fatalf("topic wrap message not defined in proto file for bridge %v", bridge)
 		}
 
-		bridgeDescs = append(bridgeDescs, bridgeDescription{
+		subscribers = append(subscribers, subscriber{
 			Name:         name,
 			PkgPath:      bridge,
 			MessageNames: messageNames,
 		})
 	}
-	desc.Bridges = bridgeDescs
+	desc.Bridges = subscribers
 
 	return desc
 }
 
-func findMessageNames(name string) ([]string, bool) {
-	reader, err := os.Open(filepath.Join("..", name, "topic.proto"))
+func findMessageNames(protoPath string) ([]string, bool) {
+	reader, err := os.Open(protoPath)
 	if err != nil {
 		log.Printf("failed to read proto file: %s", err)
 		os.Exit(1)
@@ -81,12 +81,12 @@ func findMessageNames(name string) ([]string, bool) {
 
 	names := []string{}
 	proto.Walk(definition, proto.WithOneof(func(m *proto.Oneof) {
-		if m.Name != name+"Message" {
+		if m.Name != "messages" {
 			return
 		}
 
 		parent := m.Parent.(*proto.Message)
-		if parent.Name != strings.Title(name)+"Messages" {
+		if parent.Name != "TopicMessage" {
 			return
 		}
 

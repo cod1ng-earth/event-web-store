@@ -1,5 +1,3 @@
-//go:generate go-bindata context.go.tpl
-
 package main
 
 import (

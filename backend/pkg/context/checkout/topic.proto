@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package checkout;
+
+message TopicMessage {
+    oneof messages {
+        ChangeProductQuantity changeProductQuantity = 1;
+        StockCorrected stockCorrected = 2;
+        Product product = 3;
+        OrderCart orderCart = 4;
+    }
+}
+
+message ChangeProductQuantity {
+    string cartID = 3;
+    string productID = 1;
+    int64 quantity = 2;
+}
+
+message StockCorrected {
+    string productID = 1;
+    int64 quantityChange = 2;
+    int64 fulfilmentOffset = 3;
+}
+
+message Product {
+    string productID = 1;
+    int64 price = 2;
+    string name = 3;
+    string smallImageURL = 4;
+    int64 pimOffset = 5;
+//    int64 tax = ;
+}
+
+message OrderCart {
+    string cartID = 1;
+//    string hash = 2; TODO
+}

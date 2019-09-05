@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/Shopify/sarama"
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/pim"
+	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 

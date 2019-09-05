@@ -5,10 +5,10 @@ type contextDescription struct {
 	Batch        bool
 	ReadLock     string
 	MessageNames []string
-	Bridges      []bridgeDescription
+	Bridges      []subscriber
 }
 
-type subscribers struct {
+type subscriber struct {
 	Name         string
 	PkgPath      string
 	MessageNames []string
