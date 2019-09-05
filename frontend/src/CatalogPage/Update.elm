@@ -83,7 +83,14 @@ update msg model =
                 Ok pp ->
                     let
                         updated =
-                            { model | products = Just pp.products, currentPage = pp.currentPage, totalPages = pp.totalPages, error = Nothing }
+                            case pp.request of
+                                Nothing ->
+                                    model
+                                Just catalogRequest ->
+                                    if model.currentPage /= catalogRequest.page then
+                                        model
+                                    else
+                                        { model | products = Just pp.products, currentPage = catalogRequest.page, totalPages = pp.totalPages, error = Nothing }
                     in
                         ( updated, Cmd.none )
 
@@ -106,7 +113,7 @@ fetchProducts model =
     in
         Http.get
             { url = "http://localhost:8080/products?itemsPerPage=100&sort=" ++ model.sorting ++ "&prefix=" ++ prefix ++ "&page=" ++ String.fromInt model.currentPage
-            , expect = Decode.expectBytes GotProducts Catalog.catalogPageDecoder
+            , expect = Decode.expectBytes GotProducts Catalog.catalogResponseDecoder
             }
             |> Cmd.map CatalogPageMsg
 

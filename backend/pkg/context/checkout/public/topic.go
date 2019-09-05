@@ -1,6 +1,6 @@
 //go:generate protoc --go_out=. topic.proto
 
-package published
+package checkout
 
 const (
 	Topic     = "checkout_pub"

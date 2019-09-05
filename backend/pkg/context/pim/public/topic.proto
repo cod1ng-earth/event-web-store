@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package published;
+package pim;
 
 message TopicMessage {
     oneof messages {

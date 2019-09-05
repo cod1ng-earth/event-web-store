@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package published;
+package fulfilment;
 
 message TopicMessage {
     oneof messages {

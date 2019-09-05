@@ -33,7 +33,7 @@ fetchProduct : String -> Cmd Msg
 fetchProduct id =
     Http.get
         { url = "http://localhost:8080/product?uuid=" ++ id
-        , expect = Decode.expectBytes ProductFetched Catalog.productDecoder
+        , expect = Decode.expectBytes ProductFetched Catalog.productResponseDecoder
         }
         |> Cmd.map ProductDetailPageMsg
 

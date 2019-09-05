@@ -11,7 +11,7 @@ import ProductDetailPage.Message exposing (SubMsg(..))
 type Model
     = Loading
     | LoadingSlowly
-    | Loaded Catalog.Product
+    | Loaded Catalog.ProductResponse
     | Failed String
 
 

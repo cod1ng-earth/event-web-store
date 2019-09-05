@@ -93,15 +93,18 @@ func addToCart(c *context, w http.ResponseWriter, r *http.Request, cartID string
 		return fmt.Errorf("failed to read from http body: %v", err)
 	}
 
-	cc := &ChangeProductQuantity{}
-	err = proto.Unmarshal(bytes, cc)
+	ccr := &ChangeProductQuantityRequest{}
+	err = proto.Unmarshal(bytes, ccr)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return fmt.Errorf("failed to decode cart change: %v", err)
 	}
 
-	cc.CartID = cartID
-
+	cc := &ChangeProductQuantity{
+		CartID:    cartID,
+		ProductID: ccr.ProductID,
+		Quantity:  ccr.Quantity,
+	}
 	_, msgOffset, err := c.logChangeProductQuantity(cc)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

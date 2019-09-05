@@ -8,7 +8,7 @@ import CatalogPage.Message
 
 
 type alias Model =
-    { products : Maybe (List Catalog.Product)
+    { products : Maybe (List Catalog.ProductResponse)
     , currentPage : Int
     , totalPages : Int
     , sorting : String

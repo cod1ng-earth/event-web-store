@@ -13,7 +13,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/published"
+	pim "github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/public"
 )
 
 const (
@@ -212,15 +212,15 @@ func (c *context) bridgePim() {
 		case msg := <-partition.Messages():
 			//			log.Printf("recieved message with offset %v", msg.Offset)
 
-			cc := pim.PimMessages{}
+			cc := pim.TopicMessage{}
 			err := proto.Unmarshal(msg.Value, &cc)
 			if err != nil {
 				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 			}
 
-			switch x := cc.GetPimMessage().(type) {
+			switch x := cc.GetMessages().(type) {
 
-			case *pim.PimMessages_Product:
+			case *pim.TopicMessage_Product:
 				if err := translatePimProduct(c, model, msg.Offset, cc.GetProduct()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
@@ -312,15 +312,15 @@ func (c *context) read() (*model, func()) {
 }
 
 func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := CatalogMessages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.GetCatalogMessage().(type) {
+	switch x := cc.GetMessages().(type) {
 
-	case *CatalogMessages_Product:
+	case *TopicMessage_Product:
 		return batchUpdateModelProduct(model, msg.Offset, cc.GetProduct())
 
 	case nil:
@@ -332,15 +332,15 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 }
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := CatalogMessages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.GetCatalogMessage().(type) {
+	switch x := cc.GetMessages().(type) {
 
-	case *CatalogMessages_Product:
+	case *TopicMessage_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
 
 	case nil:
@@ -355,8 +355,8 @@ func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 
 	//log.Printf("logProduct");
 
-	change := &CatalogMessages{
-		CatalogMessage: &CatalogMessages_Product{
+	change := &TopicMessage{
+		Messages: &TopicMessage_Product{
 			Product: logMsg,
 		},
 	}

@@ -3,11 +3,9 @@
 
 package checkout
 
-import (
-	fmt "fmt"
-	proto "github.com/golang/protobuf/proto"
-	math "math"
-)
+import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -18,7 +16,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type TopicMessage struct {
 	// Types that are valid to be assigned to Messages:
@@ -36,17 +34,16 @@ func (m *TopicMessage) Reset()         { *m = TopicMessage{} }
 func (m *TopicMessage) String() string { return proto.CompactTextString(m) }
 func (*TopicMessage) ProtoMessage()    {}
 func (*TopicMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7312ad0e4fa171e8, []int{0}
+	return fileDescriptor_topic_3bf597f174c5710a, []int{0}
 }
-
 func (m *TopicMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TopicMessage.Unmarshal(m, b)
 }
 func (m *TopicMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_TopicMessage.Marshal(b, m, deterministic)
 }
-func (m *TopicMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TopicMessage.Merge(m, src)
+func (dst *TopicMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TopicMessage.Merge(dst, src)
 }
 func (m *TopicMessage) XXX_Size() int {
 	return xxx_messageInfo_TopicMessage.Size(m)
@@ -120,14 +117,116 @@ func (m *TopicMessage) GetOrderCart() *OrderCart {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*TopicMessage) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*TopicMessage) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _TopicMessage_OneofMarshaler, _TopicMessage_OneofUnmarshaler, _TopicMessage_OneofSizer, []interface{}{
 		(*TopicMessage_ChangeProductQuantity)(nil),
 		(*TopicMessage_StockCorrected)(nil),
 		(*TopicMessage_Product)(nil),
 		(*TopicMessage_OrderCart)(nil),
 	}
+}
+
+func _TopicMessage_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*TopicMessage)
+	// messages
+	switch x := m.Messages.(type) {
+	case *TopicMessage_ChangeProductQuantity:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.ChangeProductQuantity); err != nil {
+			return err
+		}
+	case *TopicMessage_StockCorrected:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.StockCorrected); err != nil {
+			return err
+		}
+	case *TopicMessage_Product:
+		b.EncodeVarint(3<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Product); err != nil {
+			return err
+		}
+	case *TopicMessage_OrderCart:
+		b.EncodeVarint(4<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.OrderCart); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("TopicMessage.Messages has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _TopicMessage_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*TopicMessage)
+	switch tag {
+	case 1: // messages.changeProductQuantity
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(ChangeProductQuantity)
+		err := b.DecodeMessage(msg)
+		m.Messages = &TopicMessage_ChangeProductQuantity{msg}
+		return true, err
+	case 2: // messages.stockCorrected
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(StockCorrected)
+		err := b.DecodeMessage(msg)
+		m.Messages = &TopicMessage_StockCorrected{msg}
+		return true, err
+	case 3: // messages.product
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Product)
+		err := b.DecodeMessage(msg)
+		m.Messages = &TopicMessage_Product{msg}
+		return true, err
+	case 4: // messages.orderCart
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(OrderCart)
+		err := b.DecodeMessage(msg)
+		m.Messages = &TopicMessage_OrderCart{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _TopicMessage_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*TopicMessage)
+	// messages
+	switch x := m.Messages.(type) {
+	case *TopicMessage_ChangeProductQuantity:
+		s := proto.Size(x.ChangeProductQuantity)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *TopicMessage_StockCorrected:
+		s := proto.Size(x.StockCorrected)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *TopicMessage_Product:
+		s := proto.Size(x.Product)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *TopicMessage_OrderCart:
+		s := proto.Size(x.OrderCart)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type ChangeProductQuantity struct {
@@ -143,17 +242,16 @@ func (m *ChangeProductQuantity) Reset()         { *m = ChangeProductQuantity{} }
 func (m *ChangeProductQuantity) String() string { return proto.CompactTextString(m) }
 func (*ChangeProductQuantity) ProtoMessage()    {}
 func (*ChangeProductQuantity) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7312ad0e4fa171e8, []int{1}
+	return fileDescriptor_topic_3bf597f174c5710a, []int{1}
 }
-
 func (m *ChangeProductQuantity) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ChangeProductQuantity.Unmarshal(m, b)
 }
 func (m *ChangeProductQuantity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ChangeProductQuantity.Marshal(b, m, deterministic)
 }
-func (m *ChangeProductQuantity) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ChangeProductQuantity.Merge(m, src)
+func (dst *ChangeProductQuantity) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ChangeProductQuantity.Merge(dst, src)
 }
 func (m *ChangeProductQuantity) XXX_Size() int {
 	return xxx_messageInfo_ChangeProductQuantity.Size(m)
@@ -198,17 +296,16 @@ func (m *StockCorrected) Reset()         { *m = StockCorrected{} }
 func (m *StockCorrected) String() string { return proto.CompactTextString(m) }
 func (*StockCorrected) ProtoMessage()    {}
 func (*StockCorrected) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7312ad0e4fa171e8, []int{2}
+	return fileDescriptor_topic_3bf597f174c5710a, []int{2}
 }
-
 func (m *StockCorrected) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StockCorrected.Unmarshal(m, b)
 }
 func (m *StockCorrected) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StockCorrected.Marshal(b, m, deterministic)
 }
-func (m *StockCorrected) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StockCorrected.Merge(m, src)
+func (dst *StockCorrected) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StockCorrected.Merge(dst, src)
 }
 func (m *StockCorrected) XXX_Size() int {
 	return xxx_messageInfo_StockCorrected.Size(m)
@@ -255,17 +352,16 @@ func (m *Product) Reset()         { *m = Product{} }
 func (m *Product) String() string { return proto.CompactTextString(m) }
 func (*Product) ProtoMessage()    {}
 func (*Product) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7312ad0e4fa171e8, []int{3}
+	return fileDescriptor_topic_3bf597f174c5710a, []int{3}
 }
-
 func (m *Product) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Product.Unmarshal(m, b)
 }
 func (m *Product) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Product.Marshal(b, m, deterministic)
 }
-func (m *Product) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Product.Merge(m, src)
+func (dst *Product) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Product.Merge(dst, src)
 }
 func (m *Product) XXX_Size() int {
 	return xxx_messageInfo_Product.Size(m)
@@ -322,17 +418,16 @@ func (m *OrderCart) Reset()         { *m = OrderCart{} }
 func (m *OrderCart) String() string { return proto.CompactTextString(m) }
 func (*OrderCart) ProtoMessage()    {}
 func (*OrderCart) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7312ad0e4fa171e8, []int{4}
+	return fileDescriptor_topic_3bf597f174c5710a, []int{4}
 }
-
 func (m *OrderCart) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_OrderCart.Unmarshal(m, b)
 }
 func (m *OrderCart) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_OrderCart.Marshal(b, m, deterministic)
 }
-func (m *OrderCart) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_OrderCart.Merge(m, src)
+func (dst *OrderCart) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OrderCart.Merge(dst, src)
 }
 func (m *OrderCart) XXX_Size() int {
 	return xxx_messageInfo_OrderCart.Size(m)
@@ -358,9 +453,9 @@ func init() {
 	proto.RegisterType((*OrderCart)(nil), "checkout.OrderCart")
 }
 
-func init() { proto.RegisterFile("topic.proto", fileDescriptor_7312ad0e4fa171e8) }
+func init() { proto.RegisterFile("topic.proto", fileDescriptor_topic_3bf597f174c5710a) }
 
-var fileDescriptor_7312ad0e4fa171e8 = []byte{
+var fileDescriptor_topic_3bf597f174c5710a = []byte{
 	// 361 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x52, 0x4d, 0x4f, 0xc2, 0x40,
 	0x10, 0x6d, 0xf9, 0xee, 0xa0, 0x44, 0x57, 0x31, 0x8d, 0x31, 0xd1, 0x54, 0x63, 0x8c, 0x89, 0x1c,

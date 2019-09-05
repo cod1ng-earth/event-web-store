@@ -3,11 +3,9 @@
 
 package catalog
 
-import (
-	fmt "fmt"
-	proto "github.com/golang/protobuf/proto"
-	math "math"
-)
+import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -18,7 +16,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type CatalogRequest_Sorting int32
 
@@ -33,7 +31,6 @@ var CatalogRequest_Sorting_name = map[int32]string{
 	1: "PRICE",
 	2: "NAME",
 }
-
 var CatalogRequest_Sorting_value = map[string]int32{
 	"ID":    0,
 	"PRICE": 1,
@@ -43,9 +40,8 @@ var CatalogRequest_Sorting_value = map[string]int32{
 func (x CatalogRequest_Sorting) String() string {
 	return proto.EnumName(CatalogRequest_Sorting_name, int32(x))
 }
-
 func (CatalogRequest_Sorting) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{0, 0}
+	return fileDescriptor_api_231a699d8bb86116, []int{0, 0}
 }
 
 type CatalogRequest struct {
@@ -62,17 +58,16 @@ func (m *CatalogRequest) Reset()         { *m = CatalogRequest{} }
 func (m *CatalogRequest) String() string { return proto.CompactTextString(m) }
 func (*CatalogRequest) ProtoMessage()    {}
 func (*CatalogRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
+	return fileDescriptor_api_231a699d8bb86116, []int{0}
 }
-
 func (m *CatalogRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CatalogRequest.Unmarshal(m, b)
 }
 func (m *CatalogRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CatalogRequest.Marshal(b, m, deterministic)
 }
-func (m *CatalogRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CatalogRequest.Merge(m, src)
+func (dst *CatalogRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CatalogRequest.Merge(dst, src)
 }
 func (m *CatalogRequest) XXX_Size() int {
 	return xxx_messageInfo_CatalogRequest.Size(m)
@@ -125,17 +120,16 @@ func (m *CatalogResponse) Reset()         { *m = CatalogResponse{} }
 func (m *CatalogResponse) String() string { return proto.CompactTextString(m) }
 func (*CatalogResponse) ProtoMessage()    {}
 func (*CatalogResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
+	return fileDescriptor_api_231a699d8bb86116, []int{1}
 }
-
 func (m *CatalogResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CatalogResponse.Unmarshal(m, b)
 }
 func (m *CatalogResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CatalogResponse.Marshal(b, m, deterministic)
 }
-func (m *CatalogResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CatalogResponse.Merge(m, src)
+func (dst *CatalogResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CatalogResponse.Merge(dst, src)
 }
 func (m *CatalogResponse) XXX_Size() int {
 	return xxx_messageInfo_CatalogResponse.Size(m)
@@ -185,17 +179,16 @@ func (m *ProductRequest) Reset()         { *m = ProductRequest{} }
 func (m *ProductRequest) String() string { return proto.CompactTextString(m) }
 func (*ProductRequest) ProtoMessage()    {}
 func (*ProductRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
+	return fileDescriptor_api_231a699d8bb86116, []int{2}
 }
-
 func (m *ProductRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ProductRequest.Unmarshal(m, b)
 }
 func (m *ProductRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ProductRequest.Marshal(b, m, deterministic)
 }
-func (m *ProductRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ProductRequest.Merge(m, src)
+func (dst *ProductRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProductRequest.Merge(dst, src)
 }
 func (m *ProductRequest) XXX_Size() int {
 	return xxx_messageInfo_ProductRequest.Size(m)
@@ -232,17 +225,16 @@ func (m *ProductResponse) Reset()         { *m = ProductResponse{} }
 func (m *ProductResponse) String() string { return proto.CompactTextString(m) }
 func (*ProductResponse) ProtoMessage()    {}
 func (*ProductResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
+	return fileDescriptor_api_231a699d8bb86116, []int{3}
 }
-
 func (m *ProductResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ProductResponse.Unmarshal(m, b)
 }
 func (m *ProductResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ProductResponse.Marshal(b, m, deterministic)
 }
-func (m *ProductResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ProductResponse.Merge(m, src)
+func (dst *ProductResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProductResponse.Merge(dst, src)
 }
 func (m *ProductResponse) XXX_Size() int {
 	return xxx_messageInfo_ProductResponse.Size(m)
@@ -317,16 +309,16 @@ func (m *ProductResponse) GetDisabled() bool {
 }
 
 func init() {
-	proto.RegisterEnum("catalog.CatalogRequest_Sorting", CatalogRequest_Sorting_name, CatalogRequest_Sorting_value)
 	proto.RegisterType((*CatalogRequest)(nil), "catalog.CatalogRequest")
 	proto.RegisterType((*CatalogResponse)(nil), "catalog.CatalogResponse")
 	proto.RegisterType((*ProductRequest)(nil), "catalog.ProductRequest")
 	proto.RegisterType((*ProductResponse)(nil), "catalog.ProductResponse")
+	proto.RegisterEnum("catalog.CatalogRequest_Sorting", CatalogRequest_Sorting_name, CatalogRequest_Sorting_value)
 }
 
-func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
+func init() { proto.RegisterFile("api.proto", fileDescriptor_api_231a699d8bb86116) }
 
-var fileDescriptor_00212fb1f9d3bf1c = []byte{
+var fileDescriptor_api_231a699d8bb86116 = []byte{
 	// 404 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x92, 0xcf, 0xaa, 0xd4, 0x30,
 	0x14, 0xc6, 0x4d, 0xe7, 0x4f, 0x9b, 0x33, 0x3a, 0x77, 0x38, 0x88, 0x06, 0x17, 0x5a, 0x8a, 0x48,

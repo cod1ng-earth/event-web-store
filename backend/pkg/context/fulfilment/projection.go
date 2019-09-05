@@ -5,7 +5,12 @@
 package fulfilment
 
 type model struct {
-	inventory map[string]int64
+	inventory      map[string]int64
+	checkoutOffset int64
+}
+
+func (m *model) getCheckoutOffset() int64 {
+	return m.checkoutOffset
 }
 
 func newModel() *model {

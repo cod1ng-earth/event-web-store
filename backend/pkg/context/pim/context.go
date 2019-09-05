@@ -9,6 +9,8 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
+
+	"github.com/openacid/low/size"
 )
 
 const (
@@ -21,7 +23,7 @@ type context struct {
 
 	client   sarama.Client
 	consumer sarama.Consumer
-	producer sarama.SyncProducer
+	producer sarama.AsyncProducer
 
 	batchOffset int64
 
@@ -42,7 +44,7 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
-	producer, err := sarama.NewSyncProducerFromClient(client)
+	producer, err := sarama.NewAsyncProducerFromClient(client)
 	if err != nil {
 		log.Panicf("failed to setup kafka producer: %s", err)
 	}
@@ -72,6 +74,11 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 }
 
 func (c *context) Stop() {
+
+	m, f := c.read()
+	log.Printf("size: %d", size.Of(m))
+	f()
+
 	c.doneCh <- struct{}{}
 }
 
@@ -140,6 +147,13 @@ func (c *context) Start() {
 			//			log.Printf("recieved message with offset %v", msg.Offset)
 			writes <- msg
 
+		case err := <-c.producer.Errors():
+			log.Panicf("failure to write to kafka: %s", err)
+
+		case msg := <-c.producer.Successes():
+			_ = msg
+			//log.Printf("write to kafka: %d", msg.Offset)
+
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
 
@@ -175,15 +189,15 @@ func (c *context) read() (*model, func()) {
 }
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := PimMessages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.GetPimMessage().(type) {
+	switch x := cc.GetMessages().(type) {
 
-	case *PimMessages_Product:
+	case *TopicMessage_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
 
 	case nil:
@@ -194,24 +208,24 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	}
 }
 
-func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
+func (c *context) logProduct(logMsg *Product) {
 
 	//log.Printf("logProduct");
 
-	change := &PimMessages{
-		PimMessage: &PimMessages_Product{
+	change := &TopicMessage{
+		Messages: &TopicMessage_Product{
 			Product: logMsg,
 		},
 	}
 
 	bytes, err := proto.Marshal(change)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+		log.Panicf("failed to serialize cart change massage: %v", err)
 	}
 
 	msg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(msg)
+	c.producer.Input() <- msg
 }

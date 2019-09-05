@@ -44,25 +44,24 @@ func (pp productsByName) Len() int           { return len(pp) }
 func (pp productsByName) Swap(i, j int)      { pp[i], pp[j] = pp[j], pp[i] }
 func (pp productsByName) Less(i, j int) bool { return pp[i].Name < pp[j].Name }
 
-func (p *PimProduct) toProduct() *Product {
-	return &Product{
-		Id:            p.Id,
-		Price:         p.Price,
-		Name:          p.Name,
-		Description:   p.Description,
-		Longtext:      p.Longtext,
-		Category:      p.Category,
-		SmallImageURL: p.SmallImageURL,
-		LargeImageURL: p.LargeImageURL,
-		Disabled:      p.Disabled,
-	}
-}
+//func (p *PimProduct) toProduct() *Product {
+//	return &Product{
+//		Id:            p.Id,
+//		Price:         p.Price,
+//		Name:          p.Name,
+//		Description:   p.Description,
+//		Longtext:      p.Longtext,
+//		Category:      p.Category,
+//		SmallImageURL: p.SmallImageURL,
+//		LargeImageURL: p.LargeImageURL,
+//		Disabled:      p.Disabled,
+//	}
+//}
 
-func updateModelPimProduct(m *model, offset int64, pim *PimProduct) error {
+func updateModelProduct(m *model, offset int64, new *Product) error {
 	log.Printf("updateModelPimProduct %v", offset)
 
 	m.pimOffset = offset
-	new := pim.toProduct()
 
 	old, oldFound := m.products[new.Id]
 
@@ -132,14 +131,14 @@ func insert(slice []*Product, i int, p *Product) []*Product {
 	return append(slice[:i], append([]*Product{p}, slice[i:]...)...)
 }
 
-func batchUpdateModelPimProduct(m *model, offset int64, new *PimProduct) error {
+func batchUpdateModelProduct(m *model, offset int64, new *Product) error {
 	log.Printf("batchUpdateModelPimProduct %v", offset)
 
 	m.pimOffset = offset
 	if new.Disabled {
 		delete(m.products, new.Id)
 	} else {
-		m.products[new.Id] = new.toProduct()
+		m.products[new.Id] = new
 	}
 	return nil
 }

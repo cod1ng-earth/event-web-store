@@ -22,3 +22,8 @@ message Position {
 message OrderCartResonse {
     bool successful = 1;
 }
+
+message ChangeProductQuantityRequest {
+    string productID = 1;
+    int64 quantity = 2;
+}

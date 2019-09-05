@@ -50,27 +50,46 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 		}
 		pp = pp[startIdx:endIdx]
 
-		products := []*Product{}
+		products := []*ProductResponse{}
 		for _, p := range pp {
-			products = append(products, &Product{
-				Id:    p.Id,
-				Name:  p.Name,
-				Price: p.Price,
-			})
+			products = append(products, p.toProductResponse())
 		}
 
-		payload := &CatalogPage{
-			Products:     products,
-			TotalItems:   totalItems,
-			TotalPages:   totalPages,
-			CurrentPage:  page,
-			SetPageTo:    newPage,
-			Sorting:      sort,
-			Filtering:    prefix,
-			ItemsPerPage: itemsPerPage,
+		payload := &CatalogResponse{
+			Request: &CatalogRequest{
+				Sorting:      toSorting(sort),
+				Prefix:       prefix,
+				Page:         page,
+				ItemsPerPage: itemsPerPage,
+			},
+			Products:   products,
+			TotalItems: totalItems,
+			TotalPages: totalPages,
 		}
 
 		respond(w, payload)
+	}
+}
+
+func toSorting(sort string) CatalogRequest_Sorting {
+	s, ok := CatalogRequest_Sorting_value[sort]
+	if !ok {
+		s = 0
+	}
+	return CatalogRequest_Sorting(s)
+}
+
+func (p *Product) toProductResponse() *ProductResponse {
+	return &ProductResponse{
+		Id:            p.Id,
+		Price:         p.Price,
+		Name:          p.Name,
+		Description:   p.Description,
+		Longtext:      p.Longtext,
+		Category:      p.Category,
+		SmallImageURL: p.SmallImageURL,
+		LargeImageURL: p.LargeImageURL,
+		Disabled:      p.Disabled,
 	}
 }
 

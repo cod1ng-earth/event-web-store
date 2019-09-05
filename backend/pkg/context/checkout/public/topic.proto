@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package checkout;
+
+message TopicMessage {
+    oneof messages {
+        OrderCreated orderCreated = 1;
+    }
+}
+
+message OrderCreated {
+    string orderID = 3;
+}

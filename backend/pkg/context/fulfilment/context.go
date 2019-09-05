@@ -10,7 +10,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/checkout/published"
+	checkout "github.com/cod1ng-earth/event-web-store/backend/pkg/context/checkout/public"
 )
 
 const (
@@ -147,31 +147,16 @@ func (c *context) bridgeCheckout() {
 		case msg := <-partition.Messages():
 			//			log.Printf("recieved message with offset %v", msg.Offset)
 
-			cc := checkout.CheckoutMessages{}
+			cc := checkout.TopicMessage{}
 			err := proto.Unmarshal(msg.Value, &cc)
 			if err != nil {
 				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 			}
 
-			switch x := cc.GetCheckoutMessage().(type) {
+			switch x := cc.GetMessages().(type) {
 
-			case *checkout.CheckoutMessages_ChangeProductQuantity:
-				if err := translateCheckoutChangeProductQuantity(c, model, msg.Offset, cc.GetChangeProductQuantity()); err != nil {
-					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
-				}
-
-			case *checkout.CheckoutMessages_StockCorrected:
-				if err := translateCheckoutStockCorrected(c, model, msg.Offset, cc.GetStockCorrected()); err != nil {
-					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
-				}
-
-			case *checkout.CheckoutMessages_Product:
-				if err := translateCheckoutProduct(c, model, msg.Offset, cc.GetProduct()); err != nil {
-					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
-				}
-
-			case *checkout.CheckoutMessages_OrderCart:
-				if err := translateCheckoutOrderCart(c, model, msg.Offset, cc.GetOrderCart()); err != nil {
+			case *checkout.TopicMessage_OrderCreated:
+				if err := translateCheckoutOrderCreated(c, model, msg.Offset, cc.GetOrderCreated()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
 
@@ -246,15 +231,15 @@ func (c *context) read() (*model, func()) {
 }
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := FulfilmentMessages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.GetFulfilmentMessage().(type) {
+	switch x := cc.GetMessages().(type) {
 
-	case *FulfilmentMessages_StockCorrected:
+	case *TopicMessage_StockCorrected:
 		return updateModelStockCorrected(model, msg.Offset, cc.GetStockCorrected())
 
 	case nil:
@@ -269,8 +254,8 @@ func (c *context) logStockCorrected(logMsg *StockCorrected) (int32, int64, error
 
 	//log.Printf("logStockCorrected");
 
-	change := &FulfilmentMessages{
-		FulfilmentMessage: &FulfilmentMessages_StockCorrected{
+	change := &TopicMessage{
+		Messages: &TopicMessage_StockCorrected{
 			StockCorrected: logMsg,
 		},
 	}

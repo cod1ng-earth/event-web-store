@@ -3,3 +3,7 @@ tmp
 results.bin
 plot.html
 cmd/dev-tools/simba/simba
+main
+cpu.pprof
+mem.pprof
+trace.out

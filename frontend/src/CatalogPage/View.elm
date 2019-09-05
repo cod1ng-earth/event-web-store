@@ -108,7 +108,7 @@ filterProductsButton active label =
             [ text label ]
 
 
-renderProduct : Catalog.Product -> Html Msg
+renderProduct : Catalog.ProductResponse -> Html Msg
 renderProduct product =
     li [ class "mdl-list__item mdl-list__item--two-line" ]
         [ span [ class "mdl-list__item-primary-content" ]

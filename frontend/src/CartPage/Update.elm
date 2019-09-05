@@ -13,7 +13,7 @@ update : SubMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.cart ) of
         ( ChangeProductQuantity uuid quantity, _ ) ->
-            ( model, updateCart (Checkout.ChangeProductQuantity "" uuid quantity) )
+            ( model, updateCart (Checkout.ChangeProductQuantity uuid quantity) )
 
         ( OrderCart, _ ) ->
             ( model, orderCart )

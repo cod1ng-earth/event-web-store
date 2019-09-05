@@ -2,9 +2,9 @@
 
 
 module Checkout exposing
-    ( Cart, Position, OrderCartResonse
-    , cartDecoder, positionDecoder, orderCartResonseDecoder
-    , toCartEncoder, toPositionEncoder, toOrderCartResonseEncoder
+    ( Cart, Position, OrderCartResonse, ChangeProductQuantityRequest
+    , cartDecoder, positionDecoder, orderCartResonseDecoder, changeProductQuantityRequestDecoder
+    , toCartEncoder, toPositionEncoder, toOrderCartResonseEncoder, toChangeProductQuantityRequestEncoder
     )
 
 {-| ProtoBuf module: `Checkout`
@@ -20,17 +20,17 @@ To run it use [`elm-protocol-buffers`](https://package.elm-lang.org/packages/eri
 
 # Model
 
-@docs Cart, Position, OrderCartResonse
+@docs Cart, Position, OrderCartResonse, ChangeProductQuantityRequest
 
 
 # Decoder
 
-@docs cartDecoder, positionDecoder, orderCartResonseDecoder
+@docs cartDecoder, positionDecoder, orderCartResonseDecoder, changeProductQuantityRequestDecoder
 
 
 # Encoder
 
-@docs toCartEncoder, toPositionEncoder, toOrderCartResonseEncoder
+@docs toCartEncoder, toPositionEncoder, toOrderCartResonseEncoder, toChangeProductQuantityRequestEncoder
 
 -}
 
@@ -67,6 +67,14 @@ type alias Position =
 -}
 type alias OrderCartResonse =
     { successful : Bool
+    }
+
+
+{-| `ChangeProductQuantityRequest` message
+-}
+type alias ChangeProductQuantityRequest =
+    { productID : String
+    , quantity : Int
     }
 
 
@@ -108,6 +116,16 @@ orderCartResonseDecoder =
         ]
 
 
+{-| `ChangeProductQuantityRequest` decoder
+-}
+changeProductQuantityRequestDecoder : Decode.Decoder ChangeProductQuantityRequest
+changeProductQuantityRequestDecoder =
+    Decode.message (ChangeProductQuantityRequest "" 0)
+        [ Decode.optional 1 Decode.string setProductID
+        , Decode.optional 2 Decode.int32 setQuantity
+        ]
+
+
 
 -- ENCODER
 
@@ -143,6 +161,16 @@ toOrderCartResonseEncoder : OrderCartResonse -> Encode.Encoder
 toOrderCartResonseEncoder model =
     Encode.message
         [ ( 1, Encode.bool model.successful )
+        ]
+
+
+{-| `ChangeProductQuantityRequest` encoder
+-}
+toChangeProductQuantityRequestEncoder : ChangeProductQuantityRequest -> Encode.Encoder
+toChangeProductQuantityRequestEncoder model =
+    Encode.message
+        [ ( 1, Encode.string model.productID )
+        , ( 2, Encode.int32 model.quantity )
         ]
 
 

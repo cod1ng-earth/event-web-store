@@ -14,7 +14,6 @@ func (c *context) ImportFile(path string, verbose bool) {
 	log.Print("ImportFile")
 
 	model, free := c.read()
-	defer free()
 
 	log.Print("accessing model")
 
@@ -25,6 +24,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 		}
 		oldProducts[product.Id] = product
 	}
+	free()
 	if verbose {
 		log.Printf("loaded current products")
 	}
@@ -42,7 +42,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 
 	for newProduct := range newProducts {
 
-		log.Print("newProduct := loop")
+		//log.Print("newProduct := loop")
 
 		oldProduct, found := oldProducts[newProduct.Id]
 
@@ -57,7 +57,8 @@ func (c *context) ImportFile(path string, verbose bool) {
 		}
 
 		// if new or changed -> upsert
-		_, _, err = c.logProduct(newProduct)
+		c.logProduct(newProduct)
+		//_, _, err = c.logProduct(newProduct)
 		if err != nil {
 			log.Fatalf("failed to store product %v: %v", newProduct, err)
 		}
@@ -71,7 +72,8 @@ func (c *context) ImportFile(path string, verbose bool) {
 	for _, oldProduct := range oldProducts {
 		log.Printf("disable %v", oldProduct.Id)
 		oldProduct.Disabled = true
-		_, _, err = c.logProduct(oldProduct)
+		c.logProduct(oldProduct)
+		//_, _, err = c.logProduct(oldProduct)
 		if err != nil {
 			log.Fatalf("failed to disable product %v: %v", oldProduct, err)
 		}

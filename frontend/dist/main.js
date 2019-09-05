@@ -1529,7 +1529,7 @@ function _Json_runArrayDecoder(decoder, value, toElmValue)
 
 function _Json_isArray(value)
 {
-	return Array.isArray(value) || (typeof FileList === 'function' && value instanceof FileList);
+	return Array.isArray(value) || (typeof FileList !== 'undefined' && value instanceof FileList);
 }
 
 function _Json_toElmArray(array)
@@ -2312,6 +2312,459 @@ function _Platform_mergeExportsDebug(moduleName, obj, exports)
 	}
 }
 
+
+
+function _Time_now(millisToPosix)
+{
+	return _Scheduler_binding(function(callback)
+	{
+		callback(_Scheduler_succeed(millisToPosix(Date.now())));
+	});
+}
+
+var _Time_setInterval = F2(function(interval, task)
+{
+	return _Scheduler_binding(function(callback)
+	{
+		var id = setInterval(function() { _Scheduler_rawSpawn(task); }, interval);
+		return function() { clearInterval(id); };
+	});
+});
+
+function _Time_here()
+{
+	return _Scheduler_binding(function(callback)
+	{
+		callback(_Scheduler_succeed(
+			A2(elm$time$Time$customZone, -(new Date().getTimezoneOffset()), _List_Nil)
+		));
+	});
+}
+
+
+function _Time_getZoneName()
+{
+	return _Scheduler_binding(function(callback)
+	{
+		try
+		{
+			var name = elm$time$Time$Name(Intl.DateTimeFormat().resolvedOptions().timeZone);
+		}
+		catch (e)
+		{
+			var name = elm$time$Time$Offset(new Date().getTimezoneOffset());
+		}
+		callback(_Scheduler_succeed(name));
+	});
+}
+
+
+// BYTES
+
+function _Bytes_width(bytes)
+{
+	return bytes.byteLength;
+}
+
+var _Bytes_getHostEndianness = F2(function(le, be)
+{
+	return _Scheduler_binding(function(callback)
+	{
+		callback(_Scheduler_succeed(new Uint8Array(new Uint32Array([1]))[0] === 1 ? le : be));
+	});
+});
+
+
+// ENCODERS
+
+function _Bytes_encode(encoder)
+{
+	var mutableBytes = new DataView(new ArrayBuffer(elm$bytes$Bytes$Encode$getWidth(encoder)));
+	elm$bytes$Bytes$Encode$write(encoder)(mutableBytes)(0);
+	return mutableBytes;
+}
+
+
+// SIGNED INTEGERS
+
+var _Bytes_write_i8  = F3(function(mb, i, n) { mb.setInt8(i, n); return i + 1; });
+var _Bytes_write_i16 = F4(function(mb, i, n, isLE) { mb.setInt16(i, n, isLE); return i + 2; });
+var _Bytes_write_i32 = F4(function(mb, i, n, isLE) { mb.setInt32(i, n, isLE); return i + 4; });
+
+
+// UNSIGNED INTEGERS
+
+var _Bytes_write_u8  = F3(function(mb, i, n) { mb.setUint8(i, n); return i + 1 ;});
+var _Bytes_write_u16 = F4(function(mb, i, n, isLE) { mb.setUint16(i, n, isLE); return i + 2; });
+var _Bytes_write_u32 = F4(function(mb, i, n, isLE) { mb.setUint32(i, n, isLE); return i + 4; });
+
+
+// FLOATS
+
+var _Bytes_write_f32 = F4(function(mb, i, n, isLE) { mb.setFloat32(i, n, isLE); return i + 4; });
+var _Bytes_write_f64 = F4(function(mb, i, n, isLE) { mb.setFloat64(i, n, isLE); return i + 8; });
+
+
+// BYTES
+
+var _Bytes_write_bytes = F3(function(mb, offset, bytes)
+{
+	for (var i = 0, len = bytes.byteLength, limit = len - 4; i <= limit; i += 4)
+	{
+		mb.setUint32(offset + i, bytes.getUint32(i));
+	}
+	for (; i < len; i++)
+	{
+		mb.setUint8(offset + i, bytes.getUint8(i));
+	}
+	return offset + len;
+});
+
+
+// STRINGS
+
+function _Bytes_getStringWidth(string)
+{
+	for (var width = 0, i = 0; i < string.length; i++)
+	{
+		var code = string.charCodeAt(i);
+		width +=
+			(code < 0x80) ? 1 :
+			(code < 0x800) ? 2 :
+			(code < 0xD800 || 0xDBFF < code) ? 3 : (i++, 4);
+	}
+	return width;
+}
+
+var _Bytes_write_string = F3(function(mb, offset, string)
+{
+	for (var i = 0; i < string.length; i++)
+	{
+		var code = string.charCodeAt(i);
+		offset +=
+			(code < 0x80)
+				? (mb.setUint8(offset, code)
+				, 1
+				)
+				:
+			(code < 0x800)
+				? (mb.setUint16(offset, 0xC080 /* 0b1100000010000000 */
+					| (code >>> 6 & 0x1F /* 0b00011111 */) << 8
+					| code & 0x3F /* 0b00111111 */)
+				, 2
+				)
+				:
+			(code < 0xD800 || 0xDBFF < code)
+				? (mb.setUint16(offset, 0xE080 /* 0b1110000010000000 */
+					| (code >>> 12 & 0xF /* 0b00001111 */) << 8
+					| code >>> 6 & 0x3F /* 0b00111111 */)
+				, mb.setUint8(offset + 2, 0x80 /* 0b10000000 */
+					| code & 0x3F /* 0b00111111 */)
+				, 3
+				)
+				:
+			(code = (code - 0xD800) * 0x400 + string.charCodeAt(++i) - 0xDC00 + 0x10000
+			, mb.setUint32(offset, 0xF0808080 /* 0b11110000100000001000000010000000 */
+				| (code >>> 18 & 0x7 /* 0b00000111 */) << 24
+				| (code >>> 12 & 0x3F /* 0b00111111 */) << 16
+				| (code >>> 6 & 0x3F /* 0b00111111 */) << 8
+				| code & 0x3F /* 0b00111111 */)
+			, 4
+			);
+	}
+	return offset;
+});
+
+
+// DECODER
+
+var _Bytes_decode = F2(function(decoder, bytes)
+{
+	try {
+		return elm$core$Maybe$Just(A2(decoder, bytes, 0).b);
+	} catch(e) {
+		return elm$core$Maybe$Nothing;
+	}
+});
+
+var _Bytes_read_i8  = F2(function(      bytes, offset) { return _Utils_Tuple2(offset + 1, bytes.getInt8(offset)); });
+var _Bytes_read_i16 = F3(function(isLE, bytes, offset) { return _Utils_Tuple2(offset + 2, bytes.getInt16(offset, isLE)); });
+var _Bytes_read_i32 = F3(function(isLE, bytes, offset) { return _Utils_Tuple2(offset + 4, bytes.getInt32(offset, isLE)); });
+var _Bytes_read_u8  = F2(function(      bytes, offset) { return _Utils_Tuple2(offset + 1, bytes.getUint8(offset)); });
+var _Bytes_read_u16 = F3(function(isLE, bytes, offset) { return _Utils_Tuple2(offset + 2, bytes.getUint16(offset, isLE)); });
+var _Bytes_read_u32 = F3(function(isLE, bytes, offset) { return _Utils_Tuple2(offset + 4, bytes.getUint32(offset, isLE)); });
+var _Bytes_read_f32 = F3(function(isLE, bytes, offset) { return _Utils_Tuple2(offset + 4, bytes.getFloat32(offset, isLE)); });
+var _Bytes_read_f64 = F3(function(isLE, bytes, offset) { return _Utils_Tuple2(offset + 8, bytes.getFloat64(offset, isLE)); });
+
+var _Bytes_read_bytes = F3(function(len, bytes, offset)
+{
+	return _Utils_Tuple2(offset + len, new DataView(bytes.buffer, bytes.byteOffset + offset, len));
+});
+
+var _Bytes_read_string = F3(function(len, bytes, offset)
+{
+	var string = '';
+	var end = offset + len;
+	for (; offset < end;)
+	{
+		var byte = bytes.getUint8(offset++);
+		string +=
+			(byte < 128)
+				? String.fromCharCode(byte)
+				:
+			((byte & 0xE0 /* 0b11100000 */) === 0xC0 /* 0b11000000 */)
+				? String.fromCharCode((byte & 0x1F /* 0b00011111 */) << 6 | bytes.getUint8(offset++) & 0x3F /* 0b00111111 */)
+				:
+			((byte & 0xF0 /* 0b11110000 */) === 0xE0 /* 0b11100000 */)
+				? String.fromCharCode(
+					(byte & 0xF /* 0b00001111 */) << 12
+					| (bytes.getUint8(offset++) & 0x3F /* 0b00111111 */) << 6
+					| bytes.getUint8(offset++) & 0x3F /* 0b00111111 */
+				)
+				:
+				(byte =
+					((byte & 0x7 /* 0b00000111 */) << 18
+						| (bytes.getUint8(offset++) & 0x3F /* 0b00111111 */) << 12
+						| (bytes.getUint8(offset++) & 0x3F /* 0b00111111 */) << 6
+						| bytes.getUint8(offset++) & 0x3F /* 0b00111111 */
+					) - 0x10000
+				, String.fromCharCode(Math.floor(byte / 0x400) + 0xD800, byte % 0x400 + 0xDC00)
+				);
+	}
+	return _Utils_Tuple2(offset, string);
+});
+
+var _Bytes_decodeFailure = F2(function() { throw 0; });
+
+
+
+var _Bitwise_and = F2(function(a, b)
+{
+	return a & b;
+});
+
+var _Bitwise_or = F2(function(a, b)
+{
+	return a | b;
+});
+
+var _Bitwise_xor = F2(function(a, b)
+{
+	return a ^ b;
+});
+
+function _Bitwise_complement(a)
+{
+	return ~a;
+};
+
+var _Bitwise_shiftLeftBy = F2(function(offset, a)
+{
+	return a << offset;
+});
+
+var _Bitwise_shiftRightBy = F2(function(offset, a)
+{
+	return a >> offset;
+});
+
+var _Bitwise_shiftRightZfBy = F2(function(offset, a)
+{
+	return a >>> offset;
+});
+
+
+
+// SEND REQUEST
+
+var _Http_toTask = F3(function(router, toTask, request)
+{
+	return _Scheduler_binding(function(callback)
+	{
+		function done(response) {
+			callback(toTask(request.expect.a(response)));
+		}
+
+		var xhr = new XMLHttpRequest();
+		xhr.addEventListener('error', function() { done(elm$http$Http$NetworkError_); });
+		xhr.addEventListener('timeout', function() { done(elm$http$Http$Timeout_); });
+		xhr.addEventListener('load', function() { done(_Http_toResponse(request.expect.b, xhr)); });
+		elm$core$Maybe$isJust(request.tracker) && _Http_track(router, xhr, request.tracker.a);
+
+		try {
+			xhr.open(request.method, request.url, true);
+		} catch (e) {
+			return done(elm$http$Http$BadUrl_(request.url));
+		}
+
+		_Http_configureRequest(xhr, request);
+
+		request.body.a && xhr.setRequestHeader('Content-Type', request.body.a);
+		xhr.send(request.body.b);
+
+		return function() { xhr.c = true; xhr.abort(); };
+	});
+});
+
+
+// CONFIGURE
+
+function _Http_configureRequest(xhr, request)
+{
+	for (var headers = request.headers; headers.b; headers = headers.b) // WHILE_CONS
+	{
+		xhr.setRequestHeader(headers.a.a, headers.a.b);
+	}
+	xhr.timeout = request.timeout.a || 0;
+	xhr.responseType = request.expect.d;
+	xhr.withCredentials = request.allowCookiesFromOtherDomains;
+}
+
+
+// RESPONSES
+
+function _Http_toResponse(toBody, xhr)
+{
+	return A2(
+		200 <= xhr.status && xhr.status < 300 ? elm$http$Http$GoodStatus_ : elm$http$Http$BadStatus_,
+		_Http_toMetadata(xhr),
+		toBody(xhr.response)
+	);
+}
+
+
+// METADATA
+
+function _Http_toMetadata(xhr)
+{
+	return {
+		url: xhr.responseURL,
+		statusCode: xhr.status,
+		statusText: xhr.statusText,
+		headers: _Http_parseHeaders(xhr.getAllResponseHeaders())
+	};
+}
+
+
+// HEADERS
+
+function _Http_parseHeaders(rawHeaders)
+{
+	if (!rawHeaders)
+	{
+		return elm$core$Dict$empty;
+	}
+
+	var headers = elm$core$Dict$empty;
+	var headerPairs = rawHeaders.split('\r\n');
+	for (var i = headerPairs.length; i--; )
+	{
+		var headerPair = headerPairs[i];
+		var index = headerPair.indexOf(': ');
+		if (index > 0)
+		{
+			var key = headerPair.substring(0, index);
+			var value = headerPair.substring(index + 2);
+
+			headers = A3(elm$core$Dict$update, key, function(oldValue) {
+				return elm$core$Maybe$Just(elm$core$Maybe$isJust(oldValue)
+					? value + ', ' + oldValue.a
+					: value
+				);
+			}, headers);
+		}
+	}
+	return headers;
+}
+
+
+// EXPECT
+
+var _Http_expect = F3(function(type, toBody, toValue)
+{
+	return {
+		$: 0,
+		d: type,
+		b: toBody,
+		a: toValue
+	};
+});
+
+var _Http_mapExpect = F2(function(func, expect)
+{
+	return {
+		$: 0,
+		d: expect.d,
+		b: expect.b,
+		a: function(x) { return func(expect.a(x)); }
+	};
+});
+
+function _Http_toDataView(arrayBuffer)
+{
+	return new DataView(arrayBuffer);
+}
+
+
+// BODY and PARTS
+
+var _Http_emptyBody = { $: 0 };
+var _Http_pair = F2(function(a, b) { return { $: 0, a: a, b: b }; });
+
+function _Http_toFormData(parts)
+{
+	for (var formData = new FormData(); parts.b; parts = parts.b) // WHILE_CONS
+	{
+		var part = parts.a;
+		formData.append(part.a, part.b);
+	}
+	return formData;
+}
+
+var _Http_bytesToBlob = F2(function(mime, bytes)
+{
+	return new Blob([bytes], { type: mime });
+});
+
+
+// PROGRESS
+
+function _Http_track(router, xhr, tracker)
+{
+	// TODO check out lengthComputable on loadstart event
+
+	xhr.upload.addEventListener('progress', function(event) {
+		if (xhr.c) { return; }
+		_Scheduler_rawSpawn(A2(elm$core$Platform$sendToSelf, router, _Utils_Tuple2(tracker, elm$http$Http$Sending({
+			sent: event.loaded,
+			size: event.total
+		}))));
+	});
+	xhr.addEventListener('progress', function(event) {
+		if (xhr.c) { return; }
+		_Scheduler_rawSpawn(A2(elm$core$Platform$sendToSelf, router, _Utils_Tuple2(tracker, elm$http$Http$Receiving({
+			received: event.loaded,
+			size: event.lengthComputable ? elm$core$Maybe$Just(event.total) : elm$core$Maybe$Nothing
+		}))));
+	});
+}
+
+function _Url_percentEncode(string)
+{
+	return encodeURIComponent(string);
+}
+
+function _Url_percentDecode(string)
+{
+	try
+	{
+		return elm$core$Maybe$Just(decodeURIComponent(string));
+	}
+	catch (e)
+	{
+		return elm$core$Maybe$Nothing;
+	}
+}
 
 
 
@@ -4310,9 +4763,6 @@ function _Browser_load(url)
 		}
 	}));
 }
-var author$project$Main$Model = function (value) {
-	return {value: value};
-};
 var elm$core$Basics$False = {$: 'False'};
 var elm$core$Basics$True = {$: 'True'};
 var elm$core$Result$isOk = function (result) {
@@ -4788,62 +5238,24 @@ var elm$json$Json$Decode$errorToStringHelp = F2(
 			}
 		}
 	});
-var elm$core$Platform$Cmd$batch = _Platform_batch;
-var elm$core$Platform$Cmd$none = elm$core$Platform$Cmd$batch(_List_Nil);
-var author$project$Main$init = function (_n0) {
-	return _Utils_Tuple2(
-		author$project$Main$Model(0),
-		elm$core$Platform$Cmd$none);
-};
 var elm$core$Platform$Sub$batch = _Platform_batch;
-var elm$core$Platform$Sub$none = elm$core$Platform$Sub$batch(_List_Nil);
 var author$project$Main$subscriptions = function (_n0) {
-	return elm$core$Platform$Sub$none;
+	return elm$core$Platform$Sub$batch(_List_Nil);
 };
-var author$project$Main$update = F2(
-	function (msg, model) {
-		return _Utils_Tuple2(model, elm$core$Platform$Cmd$none);
+var author$project$CartPage$Message$LoadCart = {$: 'LoadCart'};
+var author$project$CartPage$Model$Cart = function (a) {
+	return {$: 'Cart', a: a};
+};
+var author$project$Checkout$Cart = F2(
+	function (id, positions) {
+		return {id: id, positions: positions};
 	});
+var author$project$CartPage$Model$emptyCart = A2(author$project$Checkout$Cart, '', _List_Nil);
+var author$project$Message$CartPageMsg = function (a) {
+	return {$: 'CartPageMsg', a: a};
+};
 var elm$core$Basics$identity = function (x) {
 	return x;
-};
-var elm$json$Json$Decode$map = _Json_map1;
-var elm$json$Json$Decode$map2 = _Json_map2;
-var elm$json$Json$Decode$succeed = _Json_succeed;
-var elm$virtual_dom$VirtualDom$toHandlerInt = function (handler) {
-	switch (handler.$) {
-		case 'Normal':
-			return 0;
-		case 'MayStopPropagation':
-			return 1;
-		case 'MayPreventDefault':
-			return 2;
-		default:
-			return 3;
-	}
-};
-var elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
-var elm$html$Html$text = elm$virtual_dom$VirtualDom$text;
-var author$project$Main$view = function (_n0) {
-	return elm$html$Html$text('main');
-};
-var elm$browser$Browser$External = function (a) {
-	return {$: 'External', a: a};
-};
-var elm$browser$Browser$Internal = function (a) {
-	return {$: 'Internal', a: a};
-};
-var elm$browser$Browser$Dom$NotFound = function (a) {
-	return {$: 'NotFound', a: a};
-};
-var elm$core$Basics$never = function (_n0) {
-	never:
-	while (true) {
-		var nvr = _n0.a;
-		var $temp$_n0 = nvr;
-		_n0 = $temp$_n0;
-		continue never;
-	}
 };
 var elm$core$Task$Perform = function (a) {
 	return {$: 'Perform', a: a};
@@ -4993,6 +5405,3451 @@ var elm$core$Task$perform = F2(
 			elm$core$Task$Perform(
 				A2(elm$core$Task$map, toMessage, task)));
 	});
+var elm$time$Time$Name = function (a) {
+	return {$: 'Name', a: a};
+};
+var elm$time$Time$Offset = function (a) {
+	return {$: 'Offset', a: a};
+};
+var elm$time$Time$Zone = F2(
+	function (a, b) {
+		return {$: 'Zone', a: a, b: b};
+	});
+var elm$time$Time$customZone = elm$time$Time$Zone;
+var elm$time$Time$here = _Time_here(_Utils_Tuple0);
+var author$project$CartPage$Model$init = function () {
+	var model = {
+		cart: author$project$CartPage$Model$Cart(author$project$CartPage$Model$emptyCart),
+		error: elm$core$Maybe$Nothing
+	};
+	return _Utils_Tuple2(
+		model,
+		A2(
+			elm$core$Task$perform,
+			function (_n0) {
+				return author$project$Message$CartPageMsg(author$project$CartPage$Message$LoadCart);
+			},
+			elm$time$Time$here));
+}();
+var author$project$CatalogPage$Message$LoadProducts = {$: 'LoadProducts'};
+var author$project$Message$CatalogPageMsg = function (a) {
+	return {$: 'CatalogPageMsg', a: a};
+};
+var author$project$CatalogPage$Model$init = function () {
+	var model = {currentPage: 0, error: elm$core$Maybe$Nothing, filtering: '', prefix: '', products: elm$core$Maybe$Nothing, sorting: 'name', totalPages: 0};
+	return _Utils_Tuple2(
+		model,
+		A2(
+			elm$core$Task$perform,
+			function (_n0) {
+				return author$project$Message$CatalogPageMsg(author$project$CatalogPage$Message$LoadProducts);
+			},
+			elm$time$Time$here));
+}();
+var author$project$Model$CatalogPage = function (a) {
+	return {$: 'CatalogPage', a: a};
+};
+var elm$core$Platform$Cmd$batch = _Platform_batch;
+var author$project$Model$init = function (_n0) {
+	var _n1 = author$project$CatalogPage$Model$init;
+	var catalogModel = _n1.a;
+	var catalogCmd = _n1.b;
+	var _n2 = author$project$CartPage$Model$init;
+	var cartModel = _n2.a;
+	var cartCmd = _n2.b;
+	return _Utils_Tuple2(
+		{
+			cart: cartModel,
+			content: author$project$Model$CatalogPage(catalogModel),
+			error: ''
+		},
+		elm$core$Platform$Cmd$batch(
+			_List_fromArray(
+				[cartCmd, catalogCmd])));
+};
+var author$project$CartPage$Model$OrderedCart = {$: 'OrderedCart'};
+var author$project$CartPage$Message$CartGotChanged = function (a) {
+	return {$: 'CartGotChanged', a: a};
+};
+var author$project$Checkout$Position = F7(
+	function (productID, price, name, smallImageURL, quantity, inStock, moreInStock) {
+		return {inStock: inStock, moreInStock: moreInStock, name: name, price: price, productID: productID, quantity: quantity, smallImageURL: smallImageURL};
+	});
+var author$project$Checkout$setInStock = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{inStock: value});
+	});
+var author$project$Checkout$setMoreInStock = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{moreInStock: value});
+	});
+var author$project$Checkout$setName = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{name: value});
+	});
+var author$project$Checkout$setPrice = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{price: value});
+	});
+var author$project$Checkout$setProductID = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{productID: value});
+	});
+var author$project$Checkout$setQuantity = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{quantity: value});
+	});
+var author$project$Checkout$setSmallImageURL = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{smallImageURL: value});
+	});
+var elm$bytes$Bytes$Decode$Decoder = function (a) {
+	return {$: 'Decoder', a: a};
+};
+var elm$bytes$Bytes$Decode$map = F2(
+	function (func, _n0) {
+		var decodeA = _n0.a;
+		return elm$bytes$Bytes$Decode$Decoder(
+			F2(
+				function (bites, offset) {
+					var _n1 = A2(decodeA, bites, offset);
+					var aOffset = _n1.a;
+					var a = _n1.b;
+					return _Utils_Tuple2(
+						aOffset,
+						func(a));
+				}));
+	});
+var elm$core$Basics$neq = _Utils_notEqual;
+var elm$core$Tuple$mapSecond = F2(
+	function (func, _n0) {
+		var x = _n0.a;
+		var y = _n0.b;
+		return _Utils_Tuple2(
+			x,
+			func(y));
+	});
+var eriktim$elm_protocol_buffers$Internal$Protobuf$VarInt = {$: 'VarInt'};
+var elm$bytes$Bytes$Encode$getWidth = function (builder) {
+	switch (builder.$) {
+		case 'I8':
+			return 1;
+		case 'I16':
+			return 2;
+		case 'I32':
+			return 4;
+		case 'U8':
+			return 1;
+		case 'U16':
+			return 2;
+		case 'U32':
+			return 4;
+		case 'F32':
+			return 4;
+		case 'F64':
+			return 8;
+		case 'Seq':
+			var w = builder.a;
+			return w;
+		case 'Utf8':
+			var w = builder.a;
+			return w;
+		default:
+			var bs = builder.a;
+			return _Bytes_width(bs);
+	}
+};
+var elm$bytes$Bytes$LE = {$: 'LE'};
+var elm$bytes$Bytes$Encode$write = F3(
+	function (builder, mb, offset) {
+		switch (builder.$) {
+			case 'I8':
+				var n = builder.a;
+				return A3(_Bytes_write_i8, mb, offset, n);
+			case 'I16':
+				var e = builder.a;
+				var n = builder.b;
+				return A4(
+					_Bytes_write_i16,
+					mb,
+					offset,
+					n,
+					_Utils_eq(e, elm$bytes$Bytes$LE));
+			case 'I32':
+				var e = builder.a;
+				var n = builder.b;
+				return A4(
+					_Bytes_write_i32,
+					mb,
+					offset,
+					n,
+					_Utils_eq(e, elm$bytes$Bytes$LE));
+			case 'U8':
+				var n = builder.a;
+				return A3(_Bytes_write_u8, mb, offset, n);
+			case 'U16':
+				var e = builder.a;
+				var n = builder.b;
+				return A4(
+					_Bytes_write_u16,
+					mb,
+					offset,
+					n,
+					_Utils_eq(e, elm$bytes$Bytes$LE));
+			case 'U32':
+				var e = builder.a;
+				var n = builder.b;
+				return A4(
+					_Bytes_write_u32,
+					mb,
+					offset,
+					n,
+					_Utils_eq(e, elm$bytes$Bytes$LE));
+			case 'F32':
+				var e = builder.a;
+				var n = builder.b;
+				return A4(
+					_Bytes_write_f32,
+					mb,
+					offset,
+					n,
+					_Utils_eq(e, elm$bytes$Bytes$LE));
+			case 'F64':
+				var e = builder.a;
+				var n = builder.b;
+				return A4(
+					_Bytes_write_f64,
+					mb,
+					offset,
+					n,
+					_Utils_eq(e, elm$bytes$Bytes$LE));
+			case 'Seq':
+				var bs = builder.b;
+				return A3(elm$bytes$Bytes$Encode$writeSequence, bs, mb, offset);
+			case 'Utf8':
+				var s = builder.b;
+				return A3(_Bytes_write_string, mb, offset, s);
+			default:
+				var bs = builder.a;
+				return A3(_Bytes_write_bytes, mb, offset, bs);
+		}
+	});
+var elm$bytes$Bytes$Encode$writeSequence = F3(
+	function (builders, mb, offset) {
+		writeSequence:
+		while (true) {
+			if (!builders.b) {
+				return offset;
+			} else {
+				var b = builders.a;
+				var bs = builders.b;
+				var $temp$builders = bs,
+					$temp$mb = mb,
+					$temp$offset = A3(elm$bytes$Bytes$Encode$write, b, mb, offset);
+				builders = $temp$builders;
+				mb = $temp$mb;
+				offset = $temp$offset;
+				continue writeSequence;
+			}
+		}
+	});
+var elm$bytes$Bytes$Decode$fail = elm$bytes$Bytes$Decode$Decoder(_Bytes_decodeFailure);
+var eriktim$elm_protocol_buffers$Protobuf$Decode$Decoder = function (a) {
+	return {$: 'Decoder', a: a};
+};
+var eriktim$elm_protocol_buffers$Protobuf$Decode$packedDecoder = F2(
+	function (decoderWireType, decoder) {
+		return eriktim$elm_protocol_buffers$Protobuf$Decode$Decoder(
+			function (wireType) {
+				if (wireType.$ === 'LengthDelimited') {
+					return decoder;
+				} else {
+					return _Utils_eq(wireType, decoderWireType) ? decoder : elm$bytes$Bytes$Decode$fail;
+				}
+			});
+	});
+var elm$bytes$Bytes$Decode$andThen = F2(
+	function (callback, _n0) {
+		var decodeA = _n0.a;
+		return elm$bytes$Bytes$Decode$Decoder(
+			F2(
+				function (bites, offset) {
+					var _n1 = A2(decodeA, bites, offset);
+					var newOffset = _n1.a;
+					var a = _n1.b;
+					var _n2 = callback(a);
+					var decodeB = _n2.a;
+					return A2(decodeB, bites, newOffset);
+				}));
+	});
+var elm$bytes$Bytes$Decode$succeed = function (a) {
+	return elm$bytes$Bytes$Decode$Decoder(
+		F2(
+			function (_n0, offset) {
+				return _Utils_Tuple2(offset, a);
+			}));
+};
+var elm$bytes$Bytes$Decode$unsignedInt8 = elm$bytes$Bytes$Decode$Decoder(_Bytes_read_u8);
+var elm$core$Bitwise$and = _Bitwise_and;
+var elm$core$Bitwise$shiftLeftBy = _Bitwise_shiftLeftBy;
+function eriktim$elm_protocol_buffers$Protobuf$Decode$cyclic$varIntDecoder() {
+	return A2(
+		elm$bytes$Bytes$Decode$andThen,
+		function (octet) {
+			return ((128 & octet) === 128) ? A2(
+				elm$bytes$Bytes$Decode$map,
+				function (_n0) {
+					var usedBytes = _n0.a;
+					var value = _n0.b;
+					return _Utils_Tuple2(usedBytes + 1, (127 & octet) + (value << 7));
+				},
+				eriktim$elm_protocol_buffers$Protobuf$Decode$cyclic$varIntDecoder()) : elm$bytes$Bytes$Decode$succeed(
+				_Utils_Tuple2(1, octet));
+		},
+		elm$bytes$Bytes$Decode$unsignedInt8);
+}
+try {
+	var eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder = eriktim$elm_protocol_buffers$Protobuf$Decode$cyclic$varIntDecoder();
+	eriktim$elm_protocol_buffers$Protobuf$Decode$cyclic$varIntDecoder = function () {
+		return eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder;
+	};
+} catch ($) {
+throw 'Some top-level definitions from `Protobuf.Decode` are causing infinite recursion:\n\n  ┌─────┐\n  │    varIntDecoder\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.0/halting-problem to learn how to fix it!';}
+var eriktim$elm_protocol_buffers$Protobuf$Decode$bool = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$packedDecoder,
+	eriktim$elm_protocol_buffers$Internal$Protobuf$VarInt,
+	A2(
+		elm$bytes$Bytes$Decode$map,
+		elm$core$Tuple$mapSecond(
+			elm$core$Basics$neq(0)),
+		eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder));
+var eriktim$elm_protocol_buffers$Protobuf$Decode$int32 = A2(eriktim$elm_protocol_buffers$Protobuf$Decode$packedDecoder, eriktim$elm_protocol_buffers$Internal$Protobuf$VarInt, eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder);
+var elm$bytes$Bytes$Decode$loopHelp = F4(
+	function (state, callback, bites, offset) {
+		loopHelp:
+		while (true) {
+			var _n0 = callback(state);
+			var decoder = _n0.a;
+			var _n1 = A2(decoder, bites, offset);
+			var newOffset = _n1.a;
+			var step = _n1.b;
+			if (step.$ === 'Loop') {
+				var newState = step.a;
+				var $temp$state = newState,
+					$temp$callback = callback,
+					$temp$bites = bites,
+					$temp$offset = newOffset;
+				state = $temp$state;
+				callback = $temp$callback;
+				bites = $temp$bites;
+				offset = $temp$offset;
+				continue loopHelp;
+			} else {
+				var result = step.a;
+				return _Utils_Tuple2(newOffset, result);
+			}
+		}
+	});
+var elm$bytes$Bytes$Decode$loop = F2(
+	function (state, callback) {
+		return elm$bytes$Bytes$Decode$Decoder(
+			A2(elm$bytes$Bytes$Decode$loopHelp, state, callback));
+	});
+var elm$core$Dict$RBEmpty_elm_builtin = {$: 'RBEmpty_elm_builtin'};
+var elm$core$Dict$empty = elm$core$Dict$RBEmpty_elm_builtin;
+var elm$core$Dict$Black = {$: 'Black'};
+var elm$core$Dict$RBNode_elm_builtin = F5(
+	function (a, b, c, d, e) {
+		return {$: 'RBNode_elm_builtin', a: a, b: b, c: c, d: d, e: e};
+	});
+var elm$core$Basics$compare = _Utils_compare;
+var elm$core$Dict$Red = {$: 'Red'};
+var elm$core$Dict$balance = F5(
+	function (color, key, value, left, right) {
+		if ((right.$ === 'RBNode_elm_builtin') && (right.a.$ === 'Red')) {
+			var _n1 = right.a;
+			var rK = right.b;
+			var rV = right.c;
+			var rLeft = right.d;
+			var rRight = right.e;
+			if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) {
+				var _n3 = left.a;
+				var lK = left.b;
+				var lV = left.c;
+				var lLeft = left.d;
+				var lRight = left.e;
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Red,
+					key,
+					value,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, lK, lV, lLeft, lRight),
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, rK, rV, rLeft, rRight));
+			} else {
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					color,
+					rK,
+					rV,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, key, value, left, rLeft),
+					rRight);
+			}
+		} else {
+			if ((((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) && (left.d.$ === 'RBNode_elm_builtin')) && (left.d.a.$ === 'Red')) {
+				var _n5 = left.a;
+				var lK = left.b;
+				var lV = left.c;
+				var _n6 = left.d;
+				var _n7 = _n6.a;
+				var llK = _n6.b;
+				var llV = _n6.c;
+				var llLeft = _n6.d;
+				var llRight = _n6.e;
+				var lRight = left.e;
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Red,
+					lK,
+					lV,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, llK, llV, llLeft, llRight),
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, key, value, lRight, right));
+			} else {
+				return A5(elm$core$Dict$RBNode_elm_builtin, color, key, value, left, right);
+			}
+		}
+	});
+var elm$core$Dict$insertHelp = F3(
+	function (key, value, dict) {
+		if (dict.$ === 'RBEmpty_elm_builtin') {
+			return A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, key, value, elm$core$Dict$RBEmpty_elm_builtin, elm$core$Dict$RBEmpty_elm_builtin);
+		} else {
+			var nColor = dict.a;
+			var nKey = dict.b;
+			var nValue = dict.c;
+			var nLeft = dict.d;
+			var nRight = dict.e;
+			var _n1 = A2(elm$core$Basics$compare, key, nKey);
+			switch (_n1.$) {
+				case 'LT':
+					return A5(
+						elm$core$Dict$balance,
+						nColor,
+						nKey,
+						nValue,
+						A3(elm$core$Dict$insertHelp, key, value, nLeft),
+						nRight);
+				case 'EQ':
+					return A5(elm$core$Dict$RBNode_elm_builtin, nColor, nKey, value, nLeft, nRight);
+				default:
+					return A5(
+						elm$core$Dict$balance,
+						nColor,
+						nKey,
+						nValue,
+						nLeft,
+						A3(elm$core$Dict$insertHelp, key, value, nRight));
+			}
+		}
+	});
+var elm$core$Dict$insert = F3(
+	function (key, value, dict) {
+		var _n0 = A3(elm$core$Dict$insertHelp, key, value, dict);
+		if ((_n0.$ === 'RBNode_elm_builtin') && (_n0.a.$ === 'Red')) {
+			var _n1 = _n0.a;
+			var k = _n0.b;
+			var v = _n0.c;
+			var l = _n0.d;
+			var r = _n0.e;
+			return A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, k, v, l, r);
+		} else {
+			var x = _n0;
+			return x;
+		}
+	});
+var elm$core$Dict$fromList = function (assocs) {
+	return A3(
+		elm$core$List$foldl,
+		F2(
+			function (_n0, dict) {
+				var key = _n0.a;
+				var value = _n0.b;
+				return A3(elm$core$Dict$insert, key, value, dict);
+			}),
+		elm$core$Dict$empty,
+		assocs);
+};
+var elm$core$Set$Set_elm_builtin = function (a) {
+	return {$: 'Set_elm_builtin', a: a};
+};
+var elm$core$Set$empty = elm$core$Set$Set_elm_builtin(elm$core$Dict$empty);
+var elm$core$Set$insert = F2(
+	function (key, _n0) {
+		var dict = _n0.a;
+		return elm$core$Set$Set_elm_builtin(
+			A3(elm$core$Dict$insert, key, _Utils_Tuple0, dict));
+	});
+var elm$core$Set$fromList = function (list) {
+	return A3(elm$core$List$foldl, elm$core$Set$insert, elm$core$Set$empty, list);
+};
+var elm$core$Tuple$mapFirst = F2(
+	function (func, _n0) {
+		var x = _n0.a;
+		var y = _n0.b;
+		return _Utils_Tuple2(
+			func(x),
+			y);
+	});
+var elm$bytes$Bytes$Decode$Done = function (a) {
+	return {$: 'Done', a: a};
+};
+var elm$bytes$Bytes$Decode$Loop = function (a) {
+	return {$: 'Loop', a: a};
+};
+var elm$core$Dict$get = F2(
+	function (targetKey, dict) {
+		get:
+		while (true) {
+			if (dict.$ === 'RBEmpty_elm_builtin') {
+				return elm$core$Maybe$Nothing;
+			} else {
+				var key = dict.b;
+				var value = dict.c;
+				var left = dict.d;
+				var right = dict.e;
+				var _n1 = A2(elm$core$Basics$compare, targetKey, key);
+				switch (_n1.$) {
+					case 'LT':
+						var $temp$targetKey = targetKey,
+							$temp$dict = left;
+						targetKey = $temp$targetKey;
+						dict = $temp$dict;
+						continue get;
+					case 'EQ':
+						return elm$core$Maybe$Just(value);
+					default:
+						var $temp$targetKey = targetKey,
+							$temp$dict = right;
+						targetKey = $temp$targetKey;
+						dict = $temp$dict;
+						continue get;
+				}
+			}
+		}
+	});
+var elm$core$Dict$isEmpty = function (dict) {
+	if (dict.$ === 'RBEmpty_elm_builtin') {
+		return true;
+	} else {
+		return false;
+	}
+};
+var elm$core$Set$isEmpty = function (_n0) {
+	var dict = _n0.a;
+	return elm$core$Dict$isEmpty(dict);
+};
+var elm$core$Dict$getMin = function (dict) {
+	getMin:
+	while (true) {
+		if ((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) {
+			var left = dict.d;
+			var $temp$dict = left;
+			dict = $temp$dict;
+			continue getMin;
+		} else {
+			return dict;
+		}
+	}
+};
+var elm$core$Dict$moveRedLeft = function (dict) {
+	if (((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) && (dict.e.$ === 'RBNode_elm_builtin')) {
+		if ((dict.e.d.$ === 'RBNode_elm_builtin') && (dict.e.d.a.$ === 'Red')) {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _n1 = dict.d;
+			var lClr = _n1.a;
+			var lK = _n1.b;
+			var lV = _n1.c;
+			var lLeft = _n1.d;
+			var lRight = _n1.e;
+			var _n2 = dict.e;
+			var rClr = _n2.a;
+			var rK = _n2.b;
+			var rV = _n2.c;
+			var rLeft = _n2.d;
+			var _n3 = rLeft.a;
+			var rlK = rLeft.b;
+			var rlV = rLeft.c;
+			var rlL = rLeft.d;
+			var rlR = rLeft.e;
+			var rRight = _n2.e;
+			return A5(
+				elm$core$Dict$RBNode_elm_builtin,
+				elm$core$Dict$Red,
+				rlK,
+				rlV,
+				A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Black,
+					k,
+					v,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					rlL),
+				A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, rK, rV, rlR, rRight));
+		} else {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _n4 = dict.d;
+			var lClr = _n4.a;
+			var lK = _n4.b;
+			var lV = _n4.c;
+			var lLeft = _n4.d;
+			var lRight = _n4.e;
+			var _n5 = dict.e;
+			var rClr = _n5.a;
+			var rK = _n5.b;
+			var rV = _n5.c;
+			var rLeft = _n5.d;
+			var rRight = _n5.e;
+			if (clr.$ === 'Black') {
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Black,
+					k,
+					v,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			} else {
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Black,
+					k,
+					v,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			}
+		}
+	} else {
+		return dict;
+	}
+};
+var elm$core$Dict$moveRedRight = function (dict) {
+	if (((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) && (dict.e.$ === 'RBNode_elm_builtin')) {
+		if ((dict.d.d.$ === 'RBNode_elm_builtin') && (dict.d.d.a.$ === 'Red')) {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _n1 = dict.d;
+			var lClr = _n1.a;
+			var lK = _n1.b;
+			var lV = _n1.c;
+			var _n2 = _n1.d;
+			var _n3 = _n2.a;
+			var llK = _n2.b;
+			var llV = _n2.c;
+			var llLeft = _n2.d;
+			var llRight = _n2.e;
+			var lRight = _n1.e;
+			var _n4 = dict.e;
+			var rClr = _n4.a;
+			var rK = _n4.b;
+			var rV = _n4.c;
+			var rLeft = _n4.d;
+			var rRight = _n4.e;
+			return A5(
+				elm$core$Dict$RBNode_elm_builtin,
+				elm$core$Dict$Red,
+				lK,
+				lV,
+				A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, llK, llV, llLeft, llRight),
+				A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Black,
+					k,
+					v,
+					lRight,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, rK, rV, rLeft, rRight)));
+		} else {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _n5 = dict.d;
+			var lClr = _n5.a;
+			var lK = _n5.b;
+			var lV = _n5.c;
+			var lLeft = _n5.d;
+			var lRight = _n5.e;
+			var _n6 = dict.e;
+			var rClr = _n6.a;
+			var rK = _n6.b;
+			var rV = _n6.c;
+			var rLeft = _n6.d;
+			var rRight = _n6.e;
+			if (clr.$ === 'Black') {
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Black,
+					k,
+					v,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			} else {
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					elm$core$Dict$Black,
+					k,
+					v,
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			}
+		}
+	} else {
+		return dict;
+	}
+};
+var elm$core$Dict$removeHelpPrepEQGT = F7(
+	function (targetKey, dict, color, key, value, left, right) {
+		if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) {
+			var _n1 = left.a;
+			var lK = left.b;
+			var lV = left.c;
+			var lLeft = left.d;
+			var lRight = left.e;
+			return A5(
+				elm$core$Dict$RBNode_elm_builtin,
+				color,
+				lK,
+				lV,
+				lLeft,
+				A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Red, key, value, lRight, right));
+		} else {
+			_n2$2:
+			while (true) {
+				if ((right.$ === 'RBNode_elm_builtin') && (right.a.$ === 'Black')) {
+					if (right.d.$ === 'RBNode_elm_builtin') {
+						if (right.d.a.$ === 'Black') {
+							var _n3 = right.a;
+							var _n4 = right.d;
+							var _n5 = _n4.a;
+							return elm$core$Dict$moveRedRight(dict);
+						} else {
+							break _n2$2;
+						}
+					} else {
+						var _n6 = right.a;
+						var _n7 = right.d;
+						return elm$core$Dict$moveRedRight(dict);
+					}
+				} else {
+					break _n2$2;
+				}
+			}
+			return dict;
+		}
+	});
+var elm$core$Dict$removeMin = function (dict) {
+	if ((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) {
+		var color = dict.a;
+		var key = dict.b;
+		var value = dict.c;
+		var left = dict.d;
+		var lColor = left.a;
+		var lLeft = left.d;
+		var right = dict.e;
+		if (lColor.$ === 'Black') {
+			if ((lLeft.$ === 'RBNode_elm_builtin') && (lLeft.a.$ === 'Red')) {
+				var _n3 = lLeft.a;
+				return A5(
+					elm$core$Dict$RBNode_elm_builtin,
+					color,
+					key,
+					value,
+					elm$core$Dict$removeMin(left),
+					right);
+			} else {
+				var _n4 = elm$core$Dict$moveRedLeft(dict);
+				if (_n4.$ === 'RBNode_elm_builtin') {
+					var nColor = _n4.a;
+					var nKey = _n4.b;
+					var nValue = _n4.c;
+					var nLeft = _n4.d;
+					var nRight = _n4.e;
+					return A5(
+						elm$core$Dict$balance,
+						nColor,
+						nKey,
+						nValue,
+						elm$core$Dict$removeMin(nLeft),
+						nRight);
+				} else {
+					return elm$core$Dict$RBEmpty_elm_builtin;
+				}
+			}
+		} else {
+			return A5(
+				elm$core$Dict$RBNode_elm_builtin,
+				color,
+				key,
+				value,
+				elm$core$Dict$removeMin(left),
+				right);
+		}
+	} else {
+		return elm$core$Dict$RBEmpty_elm_builtin;
+	}
+};
+var elm$core$Dict$removeHelp = F2(
+	function (targetKey, dict) {
+		if (dict.$ === 'RBEmpty_elm_builtin') {
+			return elm$core$Dict$RBEmpty_elm_builtin;
+		} else {
+			var color = dict.a;
+			var key = dict.b;
+			var value = dict.c;
+			var left = dict.d;
+			var right = dict.e;
+			if (_Utils_cmp(targetKey, key) < 0) {
+				if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Black')) {
+					var _n4 = left.a;
+					var lLeft = left.d;
+					if ((lLeft.$ === 'RBNode_elm_builtin') && (lLeft.a.$ === 'Red')) {
+						var _n6 = lLeft.a;
+						return A5(
+							elm$core$Dict$RBNode_elm_builtin,
+							color,
+							key,
+							value,
+							A2(elm$core$Dict$removeHelp, targetKey, left),
+							right);
+					} else {
+						var _n7 = elm$core$Dict$moveRedLeft(dict);
+						if (_n7.$ === 'RBNode_elm_builtin') {
+							var nColor = _n7.a;
+							var nKey = _n7.b;
+							var nValue = _n7.c;
+							var nLeft = _n7.d;
+							var nRight = _n7.e;
+							return A5(
+								elm$core$Dict$balance,
+								nColor,
+								nKey,
+								nValue,
+								A2(elm$core$Dict$removeHelp, targetKey, nLeft),
+								nRight);
+						} else {
+							return elm$core$Dict$RBEmpty_elm_builtin;
+						}
+					}
+				} else {
+					return A5(
+						elm$core$Dict$RBNode_elm_builtin,
+						color,
+						key,
+						value,
+						A2(elm$core$Dict$removeHelp, targetKey, left),
+						right);
+				}
+			} else {
+				return A2(
+					elm$core$Dict$removeHelpEQGT,
+					targetKey,
+					A7(elm$core$Dict$removeHelpPrepEQGT, targetKey, dict, color, key, value, left, right));
+			}
+		}
+	});
+var elm$core$Dict$removeHelpEQGT = F2(
+	function (targetKey, dict) {
+		if (dict.$ === 'RBNode_elm_builtin') {
+			var color = dict.a;
+			var key = dict.b;
+			var value = dict.c;
+			var left = dict.d;
+			var right = dict.e;
+			if (_Utils_eq(targetKey, key)) {
+				var _n1 = elm$core$Dict$getMin(right);
+				if (_n1.$ === 'RBNode_elm_builtin') {
+					var minKey = _n1.b;
+					var minValue = _n1.c;
+					return A5(
+						elm$core$Dict$balance,
+						color,
+						minKey,
+						minValue,
+						left,
+						elm$core$Dict$removeMin(right));
+				} else {
+					return elm$core$Dict$RBEmpty_elm_builtin;
+				}
+			} else {
+				return A5(
+					elm$core$Dict$balance,
+					color,
+					key,
+					value,
+					left,
+					A2(elm$core$Dict$removeHelp, targetKey, right));
+			}
+		} else {
+			return elm$core$Dict$RBEmpty_elm_builtin;
+		}
+	});
+var elm$core$Dict$remove = F2(
+	function (key, dict) {
+		var _n0 = A2(elm$core$Dict$removeHelp, key, dict);
+		if ((_n0.$ === 'RBNode_elm_builtin') && (_n0.a.$ === 'Red')) {
+			var _n1 = _n0.a;
+			var k = _n0.b;
+			var v = _n0.c;
+			var l = _n0.d;
+			var r = _n0.e;
+			return A5(elm$core$Dict$RBNode_elm_builtin, elm$core$Dict$Black, k, v, l, r);
+		} else {
+			var x = _n0;
+			return x;
+		}
+	});
+var elm$core$Set$remove = F2(
+	function (key, _n0) {
+		var dict = _n0.a;
+		return elm$core$Set$Set_elm_builtin(
+			A2(elm$core$Dict$remove, key, dict));
+	});
+var elm$core$Bitwise$shiftRightZfBy = _Bitwise_shiftRightZfBy;
+var eriktim$elm_protocol_buffers$Internal$Protobuf$Bit32 = {$: 'Bit32'};
+var eriktim$elm_protocol_buffers$Internal$Protobuf$Bit64 = {$: 'Bit64'};
+var eriktim$elm_protocol_buffers$Internal$Protobuf$EndGroup = {$: 'EndGroup'};
+var eriktim$elm_protocol_buffers$Internal$Protobuf$LengthDelimited = function (a) {
+	return {$: 'LengthDelimited', a: a};
+};
+var eriktim$elm_protocol_buffers$Internal$Protobuf$StartGroup = {$: 'StartGroup'};
+var eriktim$elm_protocol_buffers$Protobuf$Decode$tagDecoder = A2(
+	elm$bytes$Bytes$Decode$andThen,
+	function (_n0) {
+		var usedBytes = _n0.a;
+		var value = _n0.b;
+		var fieldNumber = value >>> 3;
+		return A2(
+			elm$bytes$Bytes$Decode$map,
+			function (_n1) {
+				var n = _n1.a;
+				var wireType = _n1.b;
+				return _Utils_Tuple2(
+					usedBytes + n,
+					_Utils_Tuple2(fieldNumber, wireType));
+			},
+			function () {
+				var _n2 = 7 & value;
+				switch (_n2) {
+					case 0:
+						return elm$bytes$Bytes$Decode$succeed(
+							_Utils_Tuple2(0, eriktim$elm_protocol_buffers$Internal$Protobuf$VarInt));
+					case 1:
+						return elm$bytes$Bytes$Decode$succeed(
+							_Utils_Tuple2(0, eriktim$elm_protocol_buffers$Internal$Protobuf$Bit64));
+					case 2:
+						return A2(
+							elm$bytes$Bytes$Decode$map,
+							elm$core$Tuple$mapSecond(eriktim$elm_protocol_buffers$Internal$Protobuf$LengthDelimited),
+							eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder);
+					case 3:
+						return elm$bytes$Bytes$Decode$succeed(
+							_Utils_Tuple2(0, eriktim$elm_protocol_buffers$Internal$Protobuf$StartGroup));
+					case 4:
+						return elm$bytes$Bytes$Decode$succeed(
+							_Utils_Tuple2(0, eriktim$elm_protocol_buffers$Internal$Protobuf$EndGroup));
+					case 5:
+						return elm$bytes$Bytes$Decode$succeed(
+							_Utils_Tuple2(0, eriktim$elm_protocol_buffers$Internal$Protobuf$Bit32));
+					default:
+						return elm$bytes$Bytes$Decode$fail;
+				}
+			}());
+	},
+	eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder);
+var elm$bytes$Bytes$Decode$bytes = function (n) {
+	return elm$bytes$Bytes$Decode$Decoder(
+		_Bytes_read_bytes(n));
+};
+var elm$core$Basics$always = F2(
+	function (a, _n0) {
+		return a;
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$unknownFieldDecoder = function (wireType) {
+	switch (wireType.$) {
+		case 'VarInt':
+			return A2(elm$bytes$Bytes$Decode$map, elm$core$Tuple$first, eriktim$elm_protocol_buffers$Protobuf$Decode$varIntDecoder);
+		case 'Bit64':
+			return A2(
+				elm$bytes$Bytes$Decode$map,
+				elm$core$Basics$always(8),
+				elm$bytes$Bytes$Decode$bytes(8));
+		case 'LengthDelimited':
+			var width = wireType.a;
+			return A2(
+				elm$bytes$Bytes$Decode$map,
+				elm$core$Basics$always(width),
+				elm$bytes$Bytes$Decode$bytes(width));
+		case 'StartGroup':
+			return elm$bytes$Bytes$Decode$fail;
+		case 'EndGroup':
+			return elm$bytes$Bytes$Decode$fail;
+		default:
+			return A2(
+				elm$bytes$Bytes$Decode$map,
+				elm$core$Basics$always(4),
+				elm$bytes$Bytes$Decode$bytes(4));
+	}
+};
+var eriktim$elm_protocol_buffers$Protobuf$Decode$stepMessage = F2(
+	function (width, state) {
+		return (state.width <= 0) ? (elm$core$Set$isEmpty(state.requiredFieldNumbers) ? elm$bytes$Bytes$Decode$succeed(
+			elm$bytes$Bytes$Decode$Done(
+				_Utils_Tuple2(width, state.model))) : elm$bytes$Bytes$Decode$fail) : A2(
+			elm$bytes$Bytes$Decode$andThen,
+			function (_n0) {
+				var usedBytes = _n0.a;
+				var _n1 = _n0.b;
+				var fieldNumber = _n1.a;
+				var wireType = _n1.b;
+				var _n2 = A2(elm$core$Dict$get, fieldNumber, state.dict);
+				if (_n2.$ === 'Just') {
+					var decoder = _n2.a.a;
+					return A2(
+						elm$bytes$Bytes$Decode$map,
+						function (_n3) {
+							var n = _n3.a;
+							var fn = _n3.b;
+							return elm$bytes$Bytes$Decode$Loop(
+								_Utils_update(
+									state,
+									{
+										model: fn(state.model),
+										requiredFieldNumbers: A2(elm$core$Set$remove, fieldNumber, state.requiredFieldNumbers),
+										width: (state.width - usedBytes) - n
+									}));
+						},
+						decoder(wireType));
+				} else {
+					return A2(
+						elm$bytes$Bytes$Decode$map,
+						function (n) {
+							return elm$bytes$Bytes$Decode$Loop(
+								_Utils_update(
+									state,
+									{width: (state.width - usedBytes) - n}));
+						},
+						eriktim$elm_protocol_buffers$Protobuf$Decode$unknownFieldDecoder(wireType));
+				}
+			},
+			eriktim$elm_protocol_buffers$Protobuf$Decode$tagDecoder);
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$message = F2(
+	function (v, fieldDecoders) {
+		var _n0 = A2(
+			elm$core$Tuple$mapSecond,
+			elm$core$Dict$fromList,
+			A2(
+				elm$core$Tuple$mapFirst,
+				elm$core$Set$fromList,
+				A3(
+					elm$core$List$foldr,
+					F2(
+						function (_n1, _n2) {
+							var isRequired = _n1.a;
+							var items = _n1.b;
+							var numbers = _n2.a;
+							var decoders = _n2.b;
+							var numbers_ = isRequired ? _Utils_ap(
+								numbers,
+								A2(elm$core$List$map, elm$core$Tuple$first, items)) : numbers;
+							return _Utils_Tuple2(
+								numbers_,
+								_Utils_ap(items, decoders));
+						}),
+					_Utils_Tuple2(_List_Nil, _List_Nil),
+					fieldDecoders)));
+		var requiredSet = _n0.a;
+		var dict = _n0.b;
+		return eriktim$elm_protocol_buffers$Protobuf$Decode$Decoder(
+			function (wireType) {
+				if (wireType.$ === 'LengthDelimited') {
+					var width = wireType.a;
+					return A2(
+						elm$bytes$Bytes$Decode$loop,
+						{dict: dict, model: v, requiredFieldNumbers: requiredSet, width: width},
+						eriktim$elm_protocol_buffers$Protobuf$Decode$stepMessage(width));
+				} else {
+					return elm$bytes$Bytes$Decode$fail;
+				}
+			});
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$FieldDecoder = F2(
+	function (a, b) {
+		return {$: 'FieldDecoder', a: a, b: b};
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$map = F2(
+	function (fn, _n0) {
+		var decoder = _n0.a;
+		return eriktim$elm_protocol_buffers$Protobuf$Decode$Decoder(
+			function (wireType) {
+				return A2(
+					elm$bytes$Bytes$Decode$map,
+					elm$core$Tuple$mapSecond(fn),
+					decoder(wireType));
+			});
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$optional = F3(
+	function (fieldNumber, decoder, set) {
+		return A2(
+			eriktim$elm_protocol_buffers$Protobuf$Decode$FieldDecoder,
+			false,
+			_List_fromArray(
+				[
+					_Utils_Tuple2(
+					fieldNumber,
+					A2(eriktim$elm_protocol_buffers$Protobuf$Decode$map, set, decoder))
+				]));
+	});
+var elm$bytes$Bytes$Decode$string = function (n) {
+	return elm$bytes$Bytes$Decode$Decoder(
+		_Bytes_read_string(n));
+};
+var elm$core$Tuple$pair = F2(
+	function (a, b) {
+		return _Utils_Tuple2(a, b);
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$lengthDelimitedDecoder = function (decoder) {
+	return eriktim$elm_protocol_buffers$Protobuf$Decode$Decoder(
+		function (wireType) {
+			if (wireType.$ === 'LengthDelimited') {
+				var width = wireType.a;
+				return A2(
+					elm$bytes$Bytes$Decode$map,
+					elm$core$Tuple$pair(width),
+					decoder(width));
+			} else {
+				return elm$bytes$Bytes$Decode$fail;
+			}
+		});
+};
+var eriktim$elm_protocol_buffers$Protobuf$Decode$string = eriktim$elm_protocol_buffers$Protobuf$Decode$lengthDelimitedDecoder(elm$bytes$Bytes$Decode$string);
+var author$project$Checkout$positionDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$message,
+	A7(author$project$Checkout$Position, '', 0, '', '', 0, false, false),
+	_List_fromArray(
+		[
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 1, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Checkout$setProductID),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 2, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Checkout$setPrice),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 3, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Checkout$setName),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 4, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Checkout$setSmallImageURL),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 6, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Checkout$setQuantity),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 7, eriktim$elm_protocol_buffers$Protobuf$Decode$bool, author$project$Checkout$setInStock),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 8, eriktim$elm_protocol_buffers$Protobuf$Decode$bool, author$project$Checkout$setMoreInStock)
+		]));
+var author$project$Checkout$setId = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{id: value});
+	});
+var author$project$Checkout$setPositions = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{positions: value});
+	});
+var elm$core$List$singleton = function (value) {
+	return _List_fromArray(
+		[value]);
+};
+var eriktim$elm_protocol_buffers$Protobuf$Decode$stepPackedField = F3(
+	function (fullWidth, decoder, _n0) {
+		var width = _n0.a;
+		var values = _n0.b;
+		return A2(
+			elm$bytes$Bytes$Decode$map,
+			function (_n1) {
+				var w = _n1.a;
+				var value = _n1.b;
+				var values_ = _Utils_ap(
+					values,
+					_List_fromArray(
+						[value]));
+				var bytesRemaining = width - w;
+				return (bytesRemaining <= 0) ? elm$bytes$Bytes$Decode$Done(
+					_Utils_Tuple2(fullWidth, values_)) : elm$bytes$Bytes$Decode$Loop(
+					_Utils_Tuple2(bytesRemaining, values_));
+			},
+			decoder);
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$repeated = F4(
+	function (fieldNumber, _n0, get, set) {
+		var decoder = _n0.a;
+		var update = F2(
+			function (value, model) {
+				return A2(
+					set,
+					_Utils_ap(
+						get(model),
+						value),
+					model);
+			});
+		var listDecoder = eriktim$elm_protocol_buffers$Protobuf$Decode$Decoder(
+			function (wireType) {
+				if (wireType.$ === 'LengthDelimited') {
+					var width = wireType.a;
+					return A2(
+						elm$bytes$Bytes$Decode$loop,
+						_Utils_Tuple2(width, _List_Nil),
+						A2(
+							eriktim$elm_protocol_buffers$Protobuf$Decode$stepPackedField,
+							width,
+							decoder(wireType)));
+				} else {
+					return A2(
+						elm$bytes$Bytes$Decode$map,
+						elm$core$Tuple$mapSecond(elm$core$List$singleton),
+						decoder(wireType));
+				}
+			});
+		return A2(
+			eriktim$elm_protocol_buffers$Protobuf$Decode$FieldDecoder,
+			false,
+			_List_fromArray(
+				[
+					_Utils_Tuple2(
+					fieldNumber,
+					A2(eriktim$elm_protocol_buffers$Protobuf$Decode$map, update, listDecoder))
+				]));
+	});
+var author$project$Checkout$cartDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$message,
+	A2(author$project$Checkout$Cart, '', _List_Nil),
+	_List_fromArray(
+		[
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 1, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Checkout$setId),
+			A4(
+			eriktim$elm_protocol_buffers$Protobuf$Decode$repeated,
+			2,
+			author$project$Checkout$positionDecoder,
+			function ($) {
+				return $.positions;
+			},
+			author$project$Checkout$setPositions)
+		]));
+var elm$core$Platform$Cmd$map = _Platform_map;
+var elm$core$Dict$update = F3(
+	function (targetKey, alter, dictionary) {
+		var _n0 = alter(
+			A2(elm$core$Dict$get, targetKey, dictionary));
+		if (_n0.$ === 'Just') {
+			var value = _n0.a;
+			return A3(elm$core$Dict$insert, targetKey, value, dictionary);
+		} else {
+			return A2(elm$core$Dict$remove, targetKey, dictionary);
+		}
+	});
+var elm$core$Maybe$isJust = function (maybe) {
+	if (maybe.$ === 'Just') {
+		return true;
+	} else {
+		return false;
+	}
+};
+var elm$core$Platform$sendToSelf = _Platform_sendToSelf;
+var elm$core$Result$map = F2(
+	function (func, ra) {
+		if (ra.$ === 'Ok') {
+			var a = ra.a;
+			return elm$core$Result$Ok(
+				func(a));
+		} else {
+			var e = ra.a;
+			return elm$core$Result$Err(e);
+		}
+	});
+var elm$http$Http$BadStatus_ = F2(
+	function (a, b) {
+		return {$: 'BadStatus_', a: a, b: b};
+	});
+var elm$http$Http$BadUrl_ = function (a) {
+	return {$: 'BadUrl_', a: a};
+};
+var elm$http$Http$GoodStatus_ = F2(
+	function (a, b) {
+		return {$: 'GoodStatus_', a: a, b: b};
+	});
+var elm$http$Http$NetworkError_ = {$: 'NetworkError_'};
+var elm$http$Http$Receiving = function (a) {
+	return {$: 'Receiving', a: a};
+};
+var elm$http$Http$Sending = function (a) {
+	return {$: 'Sending', a: a};
+};
+var elm$http$Http$Timeout_ = {$: 'Timeout_'};
+var elm$http$Http$emptyBody = _Http_emptyBody;
+var elm$http$Http$Request = function (a) {
+	return {$: 'Request', a: a};
+};
+var elm$http$Http$State = F2(
+	function (reqs, subs) {
+		return {reqs: reqs, subs: subs};
+	});
+var elm$http$Http$init = elm$core$Task$succeed(
+	A2(elm$http$Http$State, elm$core$Dict$empty, _List_Nil));
+var elm$core$Process$kill = _Scheduler_kill;
+var elm$core$Process$spawn = _Scheduler_spawn;
+var elm$http$Http$updateReqs = F3(
+	function (router, cmds, reqs) {
+		updateReqs:
+		while (true) {
+			if (!cmds.b) {
+				return elm$core$Task$succeed(reqs);
+			} else {
+				var cmd = cmds.a;
+				var otherCmds = cmds.b;
+				if (cmd.$ === 'Cancel') {
+					var tracker = cmd.a;
+					var _n2 = A2(elm$core$Dict$get, tracker, reqs);
+					if (_n2.$ === 'Nothing') {
+						var $temp$router = router,
+							$temp$cmds = otherCmds,
+							$temp$reqs = reqs;
+						router = $temp$router;
+						cmds = $temp$cmds;
+						reqs = $temp$reqs;
+						continue updateReqs;
+					} else {
+						var pid = _n2.a;
+						return A2(
+							elm$core$Task$andThen,
+							function (_n3) {
+								return A3(
+									elm$http$Http$updateReqs,
+									router,
+									otherCmds,
+									A2(elm$core$Dict$remove, tracker, reqs));
+							},
+							elm$core$Process$kill(pid));
+					}
+				} else {
+					var req = cmd.a;
+					return A2(
+						elm$core$Task$andThen,
+						function (pid) {
+							var _n4 = req.tracker;
+							if (_n4.$ === 'Nothing') {
+								return A3(elm$http$Http$updateReqs, router, otherCmds, reqs);
+							} else {
+								var tracker = _n4.a;
+								return A3(
+									elm$http$Http$updateReqs,
+									router,
+									otherCmds,
+									A3(elm$core$Dict$insert, tracker, pid, reqs));
+							}
+						},
+						elm$core$Process$spawn(
+							A3(
+								_Http_toTask,
+								router,
+								elm$core$Platform$sendToApp(router),
+								req)));
+				}
+			}
+		}
+	});
+var elm$http$Http$onEffects = F4(
+	function (router, cmds, subs, state) {
+		return A2(
+			elm$core$Task$andThen,
+			function (reqs) {
+				return elm$core$Task$succeed(
+					A2(elm$http$Http$State, reqs, subs));
+			},
+			A3(elm$http$Http$updateReqs, router, cmds, state.reqs));
+	});
+var elm$core$List$maybeCons = F3(
+	function (f, mx, xs) {
+		var _n0 = f(mx);
+		if (_n0.$ === 'Just') {
+			var x = _n0.a;
+			return A2(elm$core$List$cons, x, xs);
+		} else {
+			return xs;
+		}
+	});
+var elm$core$List$filterMap = F2(
+	function (f, xs) {
+		return A3(
+			elm$core$List$foldr,
+			elm$core$List$maybeCons(f),
+			_List_Nil,
+			xs);
+	});
+var elm$http$Http$maybeSend = F4(
+	function (router, desiredTracker, progress, _n0) {
+		var actualTracker = _n0.a;
+		var toMsg = _n0.b;
+		return _Utils_eq(desiredTracker, actualTracker) ? elm$core$Maybe$Just(
+			A2(
+				elm$core$Platform$sendToApp,
+				router,
+				toMsg(progress))) : elm$core$Maybe$Nothing;
+	});
+var elm$http$Http$onSelfMsg = F3(
+	function (router, _n0, state) {
+		var tracker = _n0.a;
+		var progress = _n0.b;
+		return A2(
+			elm$core$Task$andThen,
+			function (_n1) {
+				return elm$core$Task$succeed(state);
+			},
+			elm$core$Task$sequence(
+				A2(
+					elm$core$List$filterMap,
+					A3(elm$http$Http$maybeSend, router, tracker, progress),
+					state.subs)));
+	});
+var elm$http$Http$Cancel = function (a) {
+	return {$: 'Cancel', a: a};
+};
+var elm$http$Http$cmdMap = F2(
+	function (func, cmd) {
+		if (cmd.$ === 'Cancel') {
+			var tracker = cmd.a;
+			return elm$http$Http$Cancel(tracker);
+		} else {
+			var r = cmd.a;
+			return elm$http$Http$Request(
+				{
+					allowCookiesFromOtherDomains: r.allowCookiesFromOtherDomains,
+					body: r.body,
+					expect: A2(_Http_mapExpect, func, r.expect),
+					headers: r.headers,
+					method: r.method,
+					timeout: r.timeout,
+					tracker: r.tracker,
+					url: r.url
+				});
+		}
+	});
+var elm$core$Basics$composeR = F3(
+	function (f, g, x) {
+		return g(
+			f(x));
+	});
+var elm$http$Http$MySub = F2(
+	function (a, b) {
+		return {$: 'MySub', a: a, b: b};
+	});
+var elm$http$Http$subMap = F2(
+	function (func, _n0) {
+		var tracker = _n0.a;
+		var toMsg = _n0.b;
+		return A2(
+			elm$http$Http$MySub,
+			tracker,
+			A2(elm$core$Basics$composeR, toMsg, func));
+	});
+_Platform_effectManagers['Http'] = _Platform_createManager(elm$http$Http$init, elm$http$Http$onEffects, elm$http$Http$onSelfMsg, elm$http$Http$cmdMap, elm$http$Http$subMap);
+var elm$http$Http$command = _Platform_leaf('Http');
+var elm$http$Http$subscription = _Platform_leaf('Http');
+var elm$http$Http$riskyRequest = function (r) {
+	return elm$http$Http$command(
+		elm$http$Http$Request(
+			{allowCookiesFromOtherDomains: true, body: r.body, expect: r.expect, headers: r.headers, method: r.method, timeout: r.timeout, tracker: r.tracker, url: r.url}));
+};
+var elm$http$Http$BadBody = function (a) {
+	return {$: 'BadBody', a: a};
+};
+var elm$http$Http$BadStatus = function (a) {
+	return {$: 'BadStatus', a: a};
+};
+var elm$http$Http$BadUrl = function (a) {
+	return {$: 'BadUrl', a: a};
+};
+var elm$http$Http$NetworkError = {$: 'NetworkError'};
+var elm$http$Http$Timeout = {$: 'Timeout'};
+var elm$http$Http$expectBytesResponse = F2(
+	function (toMsg, toResult) {
+		return A3(
+			_Http_expect,
+			'arraybuffer',
+			_Http_toDataView,
+			A2(elm$core$Basics$composeR, toResult, toMsg));
+	});
+var elm$bytes$Bytes$width = _Bytes_width;
+var elm$bytes$Bytes$Decode$decode = F2(
+	function (_n0, bs) {
+		var decoder = _n0.a;
+		return A2(_Bytes_decode, decoder, bs);
+	});
+var elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return elm$core$Maybe$Nothing;
+		}
+	});
+var elm$core$Tuple$second = function (_n0) {
+	var y = _n0.b;
+	return y;
+};
+var eriktim$elm_protocol_buffers$Protobuf$Decode$decode = F2(
+	function (_n0, bs) {
+		var decoder = _n0.a;
+		var wireType = eriktim$elm_protocol_buffers$Internal$Protobuf$LengthDelimited(
+			elm$bytes$Bytes$width(bs));
+		return A2(
+			elm$core$Maybe$map,
+			elm$core$Tuple$second,
+			A2(
+				elm$bytes$Bytes$Decode$decode,
+				decoder(wireType),
+				bs));
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Decode$expectBytes = F2(
+	function (toMsg, decoder) {
+		return A2(
+			elm$http$Http$expectBytesResponse,
+			toMsg,
+			function (response) {
+				switch (response.$) {
+					case 'BadUrl_':
+						var url = response.a;
+						return elm$core$Result$Err(
+							elm$http$Http$BadUrl(url));
+					case 'Timeout_':
+						return elm$core$Result$Err(elm$http$Http$Timeout);
+					case 'NetworkError_':
+						return elm$core$Result$Err(elm$http$Http$NetworkError);
+					case 'BadStatus_':
+						var metadata = response.a;
+						return elm$core$Result$Err(
+							elm$http$Http$BadStatus(metadata.statusCode));
+					default:
+						var body = response.b;
+						var _n1 = A2(eriktim$elm_protocol_buffers$Protobuf$Decode$decode, decoder, body);
+						if (_n1.$ === 'Just') {
+							var value = _n1.a;
+							return elm$core$Result$Ok(value);
+						} else {
+							return elm$core$Result$Err(
+								elm$http$Http$BadBody('Protobuf decoder error'));
+						}
+				}
+			});
+	});
+var author$project$CartPage$Update$fetchCart = A2(
+	elm$core$Platform$Cmd$map,
+	author$project$Message$CartPageMsg,
+	elm$http$Http$riskyRequest(
+		{
+			body: elm$http$Http$emptyBody,
+			expect: A2(eriktim$elm_protocol_buffers$Protobuf$Decode$expectBytes, author$project$CartPage$Message$CartGotChanged, author$project$Checkout$cartDecoder),
+			headers: _List_Nil,
+			method: 'GET',
+			timeout: elm$core$Maybe$Nothing,
+			tracker: elm$core$Maybe$Nothing,
+			url: 'http://localhost:8080/cart'
+		}));
+var author$project$CartPage$Message$CartGotOrdered = function (a) {
+	return {$: 'CartGotOrdered', a: a};
+};
+var author$project$Checkout$OrderCartResonse = function (successful) {
+	return {successful: successful};
+};
+var author$project$Checkout$setSuccessful = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{successful: value});
+	});
+var author$project$Checkout$orderCartResonseDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$message,
+	author$project$Checkout$OrderCartResonse(false),
+	_List_fromArray(
+		[
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 1, eriktim$elm_protocol_buffers$Protobuf$Decode$bool, author$project$Checkout$setSuccessful)
+		]));
+var author$project$CartPage$Update$orderCart = A2(
+	elm$core$Platform$Cmd$map,
+	author$project$Message$CartPageMsg,
+	elm$http$Http$riskyRequest(
+		{
+			body: elm$http$Http$emptyBody,
+			expect: A2(eriktim$elm_protocol_buffers$Protobuf$Decode$expectBytes, author$project$CartPage$Message$CartGotOrdered, author$project$Checkout$orderCartResonseDecoder),
+			headers: _List_Nil,
+			method: 'POST',
+			timeout: elm$core$Maybe$Nothing,
+			tracker: elm$core$Maybe$Nothing,
+			url: 'http://localhost:8080/orderCart'
+		}));
+var author$project$CartPage$Update$toString = function (error) {
+	switch (error.$) {
+		case 'BadUrl':
+			var url = error.a;
+			return url + ' is bad';
+		case 'Timeout':
+			return 'Timeout';
+		case 'NetworkError':
+			return 'Network Error';
+		case 'BadStatus':
+			var status = error.a;
+			return elm$core$String$fromInt(status) + ' Status';
+		default:
+			var msg = error.a;
+			return msg;
+	}
+};
+var elm$core$Basics$composeL = F3(
+	function (g, f, x) {
+		return g(
+			f(x));
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Encode$Encoder = F2(
+	function (a, b) {
+		return {$: 'Encoder', a: a, b: b};
+	});
+var elm$bytes$Bytes$Encode$Seq = F2(
+	function (a, b) {
+		return {$: 'Seq', a: a, b: b};
+	});
+var elm$bytes$Bytes$Encode$getWidths = F2(
+	function (width, builders) {
+		getWidths:
+		while (true) {
+			if (!builders.b) {
+				return width;
+			} else {
+				var b = builders.a;
+				var bs = builders.b;
+				var $temp$width = width + elm$bytes$Bytes$Encode$getWidth(b),
+					$temp$builders = bs;
+				width = $temp$width;
+				builders = $temp$builders;
+				continue getWidths;
+			}
+		}
+	});
+var elm$bytes$Bytes$Encode$sequence = function (builders) {
+	return A2(
+		elm$bytes$Bytes$Encode$Seq,
+		A2(elm$bytes$Bytes$Encode$getWidths, 0, builders),
+		builders);
+};
+var elm$bytes$Bytes$Encode$U8 = function (a) {
+	return {$: 'U8', a: a};
+};
+var elm$bytes$Bytes$Encode$unsignedInt8 = elm$bytes$Bytes$Encode$U8;
+var elm$core$Bitwise$or = _Bitwise_or;
+var eriktim$elm_protocol_buffers$Protobuf$Encode$toVarIntEncoders = function (value) {
+	var higherBits = value >>> 7;
+	var base128 = 127 & value;
+	return higherBits ? A2(
+		elm$core$List$cons,
+		elm$bytes$Bytes$Encode$unsignedInt8(128 | base128),
+		eriktim$elm_protocol_buffers$Protobuf$Encode$toVarIntEncoders(higherBits)) : _List_fromArray(
+		[
+			elm$bytes$Bytes$Encode$unsignedInt8(base128)
+		]);
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$varInt = function (value) {
+	var encoders = eriktim$elm_protocol_buffers$Protobuf$Encode$toVarIntEncoders(value);
+	return _Utils_Tuple2(
+		elm$core$List$length(encoders),
+		elm$bytes$Bytes$Encode$sequence(encoders));
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$int32 = A2(
+	elm$core$Basics$composeL,
+	eriktim$elm_protocol_buffers$Protobuf$Encode$Encoder(eriktim$elm_protocol_buffers$Internal$Protobuf$VarInt),
+	eriktim$elm_protocol_buffers$Protobuf$Encode$varInt);
+var elm$core$List$sortBy = _List_sortBy;
+var elm$core$List$sum = function (numbers) {
+	return A3(elm$core$List$foldl, elm$core$Basics$add, 0, numbers);
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$sequence = function (items) {
+	var width = elm$core$List$sum(
+		A2(elm$core$List$map, elm$core$Tuple$first, items));
+	return _Utils_Tuple2(
+		width,
+		elm$bytes$Bytes$Encode$sequence(
+			A2(elm$core$List$map, elm$core$Tuple$second, items)));
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$tag = F2(
+	function (fieldNumber, wireType) {
+		var encodeTag = function (base4) {
+			return eriktim$elm_protocol_buffers$Protobuf$Encode$varInt((fieldNumber << 3) | base4);
+		};
+		switch (wireType.$) {
+			case 'VarInt':
+				return encodeTag(0);
+			case 'Bit64':
+				return encodeTag(1);
+			case 'LengthDelimited':
+				var width = wireType.a;
+				return eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(
+					_List_fromArray(
+						[
+							encodeTag(2),
+							eriktim$elm_protocol_buffers$Protobuf$Encode$varInt(width)
+						]));
+			case 'StartGroup':
+				return encodeTag(3);
+			case 'EndGroup':
+				return encodeTag(4);
+			default:
+				return encodeTag(5);
+		}
+	});
+var eriktim$elm_protocol_buffers$Protobuf$Encode$unwrap = function (encoder) {
+	if (encoder.$ === 'Encoder') {
+		var encoder_ = encoder.b;
+		return elm$core$Maybe$Just(encoder_);
+	} else {
+		return elm$core$Maybe$Nothing;
+	}
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$toPackedEncoder = function (encoders) {
+	if (encoders.b && (encoders.a.$ === 'Encoder')) {
+		var _n1 = encoders.a;
+		var wireType = _n1.a;
+		var encoder = _n1.b;
+		var others = encoders.b;
+		if (wireType.$ === 'LengthDelimited') {
+			return elm$core$Maybe$Nothing;
+		} else {
+			return elm$core$Maybe$Just(
+				eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(
+					A2(
+						elm$core$List$cons,
+						encoder,
+						A2(elm$core$List$filterMap, eriktim$elm_protocol_buffers$Protobuf$Encode$unwrap, others))));
+		}
+	} else {
+		return elm$core$Maybe$Nothing;
+	}
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$toKeyValuePairEncoder = function (_n0) {
+	var fieldNumber = _n0.a;
+	var encoder = _n0.b;
+	switch (encoder.$) {
+		case 'Encoder':
+			var wireType = encoder.a;
+			var encoder_ = encoder.b;
+			return eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(
+				_List_fromArray(
+					[
+						A2(eriktim$elm_protocol_buffers$Protobuf$Encode$tag, fieldNumber, wireType),
+						encoder_
+					]));
+		case 'ListEncoder':
+			var encoders = encoder.a;
+			var _n2 = eriktim$elm_protocol_buffers$Protobuf$Encode$toPackedEncoder(encoders);
+			if (_n2.$ === 'Just') {
+				var encoder_ = _n2.a;
+				return eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(
+					_List_fromArray(
+						[
+							A2(
+							eriktim$elm_protocol_buffers$Protobuf$Encode$tag,
+							fieldNumber,
+							eriktim$elm_protocol_buffers$Internal$Protobuf$LengthDelimited(encoder_.a)),
+							encoder_
+						]));
+			} else {
+				return eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(
+					A2(
+						elm$core$List$map,
+						A2(
+							elm$core$Basics$composeL,
+							eriktim$elm_protocol_buffers$Protobuf$Encode$toKeyValuePairEncoder,
+							elm$core$Tuple$pair(fieldNumber)),
+						encoders));
+			}
+		default:
+			return eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(_List_Nil);
+	}
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$message = function (items) {
+	return function (e) {
+		return A2(
+			eriktim$elm_protocol_buffers$Protobuf$Encode$Encoder,
+			eriktim$elm_protocol_buffers$Internal$Protobuf$LengthDelimited(e.a),
+			e);
+	}(
+		eriktim$elm_protocol_buffers$Protobuf$Encode$sequence(
+			A2(
+				elm$core$List$map,
+				eriktim$elm_protocol_buffers$Protobuf$Encode$toKeyValuePairEncoder,
+				A2(elm$core$List$sortBy, elm$core$Tuple$first, items))));
+};
+var elm$bytes$Bytes$Encode$getStringWidth = _Bytes_getStringWidth;
+var elm$bytes$Bytes$Encode$Utf8 = F2(
+	function (a, b) {
+		return {$: 'Utf8', a: a, b: b};
+	});
+var elm$bytes$Bytes$Encode$string = function (str) {
+	return A2(
+		elm$bytes$Bytes$Encode$Utf8,
+		_Bytes_getStringWidth(str),
+		str);
+};
+var eriktim$elm_protocol_buffers$Protobuf$Encode$string = function (v) {
+	var width = elm$bytes$Bytes$Encode$getStringWidth(v);
+	return A2(
+		eriktim$elm_protocol_buffers$Protobuf$Encode$Encoder,
+		eriktim$elm_protocol_buffers$Internal$Protobuf$LengthDelimited(width),
+		_Utils_Tuple2(
+			width,
+			elm$bytes$Bytes$Encode$string(v)));
+};
+var author$project$Checkout$toChangeProductQuantityEncoder = function (model) {
+	return eriktim$elm_protocol_buffers$Protobuf$Encode$message(
+		_List_fromArray(
+			[
+				_Utils_Tuple2(
+				1,
+				eriktim$elm_protocol_buffers$Protobuf$Encode$string(model.productID)),
+				_Utils_Tuple2(
+				2,
+				eriktim$elm_protocol_buffers$Protobuf$Encode$int32(model.quantity))
+			]));
+};
+var elm$http$Http$bytesBody = _Http_pair;
+var elm$bytes$Bytes$Encode$Bytes = function (a) {
+	return {$: 'Bytes', a: a};
+};
+var elm$bytes$Bytes$Encode$bytes = elm$bytes$Bytes$Encode$Bytes;
+var elm$bytes$Bytes$Encode$encode = _Bytes_encode;
+var eriktim$elm_protocol_buffers$Protobuf$Encode$encode = function (encoder) {
+	switch (encoder.$) {
+		case 'Encoder':
+			var _n1 = encoder.b;
+			var encoder_ = _n1.b;
+			return elm$bytes$Bytes$Encode$encode(encoder_);
+		case 'ListEncoder':
+			var encoders = encoder.a;
+			return elm$bytes$Bytes$Encode$encode(
+				elm$bytes$Bytes$Encode$sequence(
+					A2(
+						elm$core$List$map,
+						A2(elm$core$Basics$composeL, elm$bytes$Bytes$Encode$bytes, eriktim$elm_protocol_buffers$Protobuf$Encode$encode),
+						encoders)));
+		default:
+			return elm$bytes$Bytes$Encode$encode(
+				elm$bytes$Bytes$Encode$sequence(_List_Nil));
+	}
+};
+var author$project$CartPage$Update$updateCart = function (cartChange) {
+	var e = A2(eriktim$elm_protocol_buffers$Protobuf$Decode$expectBytes, author$project$CartPage$Message$CartGotChanged, author$project$Checkout$cartDecoder);
+	return A2(
+		elm$core$Platform$Cmd$map,
+		author$project$Message$CartPageMsg,
+		elm$http$Http$riskyRequest(
+			{
+				body: A2(
+					elm$http$Http$bytesBody,
+					'application/octet-stream',
+					eriktim$elm_protocol_buffers$Protobuf$Encode$encode(
+						author$project$Checkout$toChangeProductQuantityEncoder(cartChange))),
+				expect: e,
+				headers: _List_Nil,
+				method: 'POST',
+				timeout: elm$core$Maybe$Nothing,
+				tracker: elm$core$Maybe$Nothing,
+				url: 'http://localhost:8080/cart'
+			}));
+};
+var author$project$Checkout$ChangeProductQuantity = F2(
+	function (productID, quantity) {
+		return {productID: productID, quantity: quantity};
+	});
+var elm$core$Platform$Cmd$none = elm$core$Platform$Cmd$batch(_List_Nil);
+var author$project$CartPage$Update$update = F2(
+	function (msg, model) {
+		var _n0 = _Utils_Tuple2(msg, model.cart);
+		switch (_n0.a.$) {
+			case 'ChangeProductQuantity':
+				var _n1 = _n0.a;
+				var uuid = _n1.a;
+				var quantity = _n1.b;
+				return _Utils_Tuple2(
+					model,
+					author$project$CartPage$Update$updateCart(
+						A2(author$project$Checkout$ChangeProductQuantity, uuid, quantity)));
+			case 'OrderCart':
+				var _n2 = _n0.a;
+				return _Utils_Tuple2(model, author$project$CartPage$Update$orderCart);
+			case 'LoadCart':
+				var _n3 = _n0.a;
+				return _Utils_Tuple2(model, author$project$CartPage$Update$fetchCart);
+			case 'CartGotChanged':
+				if (_n0.a.a.$ === 'Ok') {
+					var newCart = _n0.a.a.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								cart: author$project$CartPage$Model$Cart(newCart),
+								error: elm$core$Maybe$Nothing
+							}),
+						elm$core$Platform$Cmd$none);
+				} else {
+					var e = _n0.a.a.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								error: elm$core$Maybe$Just(
+									author$project$CartPage$Update$toString(e))
+							}),
+						elm$core$Platform$Cmd$none);
+				}
+			default:
+				if (_n0.a.a.$ === 'Ok') {
+					var orderState = _n0.a.a.a;
+					return orderState.successful ? _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{cart: author$project$CartPage$Model$OrderedCart, error: elm$core$Maybe$Nothing}),
+						elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								error: elm$core$Maybe$Just('failed to order cart')
+							}),
+						elm$core$Platform$Cmd$none);
+				} else {
+					var e = _n0.a.a.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								error: elm$core$Maybe$Just(
+									author$project$CartPage$Update$toString(e))
+							}),
+						elm$core$Platform$Cmd$none);
+				}
+		}
+	});
+var author$project$Catalog$CatalogResponse = F4(
+	function (request, products, totalItems, totalPages) {
+		return {products: products, request: request, totalItems: totalItems, totalPages: totalPages};
+	});
+var author$project$Catalog$CatalogRequest = F4(
+	function (sorting, prefix, page, itemsPerPage) {
+		return {itemsPerPage: itemsPerPage, page: page, prefix: prefix, sorting: sorting};
+	});
+var author$project$Catalog$Id = {$: 'Id'};
+var author$project$Catalog$CatalogRequestSortingUnrecognized_ = function (a) {
+	return {$: 'CatalogRequestSortingUnrecognized_', a: a};
+};
+var author$project$Catalog$Name = {$: 'Name'};
+var author$project$Catalog$Price = {$: 'Price'};
+var author$project$Catalog$catalogRequestSortingDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$map,
+	function (value) {
+		switch (value) {
+			case 0:
+				return author$project$Catalog$Id;
+			case 1:
+				return author$project$Catalog$Price;
+			case 2:
+				return author$project$Catalog$Name;
+			default:
+				var v = value;
+				return author$project$Catalog$CatalogRequestSortingUnrecognized_(v);
+		}
+	},
+	eriktim$elm_protocol_buffers$Protobuf$Decode$int32);
+var author$project$Catalog$setItemsPerPage = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{itemsPerPage: value});
+	});
+var author$project$Catalog$setPage = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{page: value});
+	});
+var author$project$Catalog$setPrefix = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{prefix: value});
+	});
+var author$project$Catalog$setSorting = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{sorting: value});
+	});
+var author$project$Catalog$catalogRequestDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$message,
+	A4(author$project$Catalog$CatalogRequest, author$project$Catalog$Id, '', 0, 0),
+	_List_fromArray(
+		[
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 1, author$project$Catalog$catalogRequestSortingDecoder, author$project$Catalog$setSorting),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 2, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setPrefix),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 3, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Catalog$setPage),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 4, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Catalog$setItemsPerPage)
+		]));
+var author$project$Catalog$ProductResponse = F9(
+	function (id, price, name, description, longtext, category, smallImageURL, largeImageURL, disabled) {
+		return {category: category, description: description, disabled: disabled, id: id, largeImageURL: largeImageURL, longtext: longtext, name: name, price: price, smallImageURL: smallImageURL};
+	});
+var author$project$Catalog$setCategory = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{category: value});
+	});
+var author$project$Catalog$setDescription = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{description: value});
+	});
+var author$project$Catalog$setDisabled = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{disabled: value});
+	});
+var author$project$Catalog$setId = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{id: value});
+	});
+var author$project$Catalog$setLargeImageURL = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{largeImageURL: value});
+	});
+var author$project$Catalog$setLongtext = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{longtext: value});
+	});
+var author$project$Catalog$setName = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{name: value});
+	});
+var author$project$Catalog$setPrice = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{price: value});
+	});
+var author$project$Catalog$setSmallImageURL = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{smallImageURL: value});
+	});
+var author$project$Catalog$productResponseDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$message,
+	A9(author$project$Catalog$ProductResponse, '', 0, '', '', '', '', '', '', false),
+	_List_fromArray(
+		[
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 1, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setId),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 2, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Catalog$setPrice),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 3, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setName),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 4, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setDescription),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 5, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setLongtext),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 6, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setCategory),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 7, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setSmallImageURL),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 8, eriktim$elm_protocol_buffers$Protobuf$Decode$string, author$project$Catalog$setLargeImageURL),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 9, eriktim$elm_protocol_buffers$Protobuf$Decode$bool, author$project$Catalog$setDisabled)
+		]));
+var author$project$Catalog$setProducts = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{products: value});
+	});
+var author$project$Catalog$setRequest = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{request: value});
+	});
+var author$project$Catalog$setTotalItems = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{totalItems: value});
+	});
+var author$project$Catalog$setTotalPages = F2(
+	function (value, model) {
+		return _Utils_update(
+			model,
+			{totalPages: value});
+	});
+var author$project$Catalog$catalogResponseDecoder = A2(
+	eriktim$elm_protocol_buffers$Protobuf$Decode$message,
+	A4(author$project$Catalog$CatalogResponse, elm$core$Maybe$Nothing, _List_Nil, 0, 0),
+	_List_fromArray(
+		[
+			A3(
+			eriktim$elm_protocol_buffers$Protobuf$Decode$optional,
+			1,
+			A2(eriktim$elm_protocol_buffers$Protobuf$Decode$map, elm$core$Maybe$Just, author$project$Catalog$catalogRequestDecoder),
+			author$project$Catalog$setRequest),
+			A4(
+			eriktim$elm_protocol_buffers$Protobuf$Decode$repeated,
+			9,
+			author$project$Catalog$productResponseDecoder,
+			function ($) {
+				return $.products;
+			},
+			author$project$Catalog$setProducts),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 2, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Catalog$setTotalItems),
+			A3(eriktim$elm_protocol_buffers$Protobuf$Decode$optional, 3, eriktim$elm_protocol_buffers$Protobuf$Decode$int32, author$project$Catalog$setTotalPages)
+		]));
+var author$project$CatalogPage$Message$GotProducts = function (a) {
+	return {$: 'GotProducts', a: a};
+};
+var elm$http$Http$request = function (r) {
+	return elm$http$Http$command(
+		elm$http$Http$Request(
+			{allowCookiesFromOtherDomains: false, body: r.body, expect: r.expect, headers: r.headers, method: r.method, timeout: r.timeout, tracker: r.tracker, url: r.url}));
+};
+var elm$http$Http$get = function (r) {
+	return elm$http$Http$request(
+		{body: elm$http$Http$emptyBody, expect: r.expect, headers: _List_Nil, method: 'GET', timeout: elm$core$Maybe$Nothing, tracker: elm$core$Maybe$Nothing, url: r.url});
+};
+var elm$url$Url$percentEncode = _Url_percentEncode;
+var author$project$CatalogPage$Update$fetchProducts = function (model) {
+	var prefix = (model.filtering === '') ? '' : elm$url$Url$percentEncode(model.prefix);
+	return A2(
+		elm$core$Platform$Cmd$map,
+		author$project$Message$CatalogPageMsg,
+		elm$http$Http$get(
+			{
+				expect: A2(eriktim$elm_protocol_buffers$Protobuf$Decode$expectBytes, author$project$CatalogPage$Message$GotProducts, author$project$Catalog$catalogResponseDecoder),
+				url: 'http://localhost:8080/products?itemsPerPage=100&sort=' + (model.sorting + ('&prefix=' + (prefix + ('&page=' + elm$core$String$fromInt(model.currentPage)))))
+			}));
+};
+var author$project$CatalogPage$Update$toString = function (error) {
+	switch (error.$) {
+		case 'BadUrl':
+			var url = error.a;
+			return url + ' is bad';
+		case 'Timeout':
+			return 'Timeout';
+		case 'NetworkError':
+			return 'Network Error';
+		case 'BadStatus':
+			var status = error.a;
+			return elm$core$String$fromInt(status) + ' Status';
+		default:
+			var msg = error.a;
+			return msg;
+	}
+};
+var elm$core$Maybe$withDefault = F2(
+	function (_default, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return value;
+		} else {
+			return _default;
+		}
+	});
+var elm$core$String$toInt = _String_toInt;
+var author$project$CatalogPage$Update$update = F2(
+	function (msg, model) {
+		switch (msg.$) {
+			case 'PreviousPage':
+				var updated = _Utils_update(
+					model,
+					{currentPage: model.currentPage - 1});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'NextPage':
+				var updated = _Utils_update(
+					model,
+					{currentPage: model.currentPage + 1});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'SortByUuid':
+				var updated = _Utils_update(
+					model,
+					{sorting: 'uuid'});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'SortByPrice':
+				var updated = _Utils_update(
+					model,
+					{sorting: 'price'});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'SortByName':
+				var updated = _Utils_update(
+					model,
+					{sorting: 'name'});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'DisableFilterByPrefix':
+				var updated = _Utils_update(
+					model,
+					{filtering: ''});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'EnableFilterByPrefix':
+				var updated = _Utils_update(
+					model,
+					{filtering: 'prefix'});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'GoToPage':
+				var page = msg.a;
+				var updated = _Utils_update(
+					model,
+					{
+						currentPage: A2(
+							elm$core$Maybe$withDefault,
+							0,
+							elm$core$String$toInt(page)) - 1
+					});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'SetFilterPrefix':
+				var prefix = msg.a;
+				var updated = _Utils_update(
+					model,
+					{prefix: prefix});
+				return _Utils_Tuple2(
+					updated,
+					author$project$CatalogPage$Update$fetchProducts(updated));
+			case 'LoadProducts':
+				return _Utils_Tuple2(
+					model,
+					author$project$CatalogPage$Update$fetchProducts(model));
+			default:
+				var result = msg.a;
+				if (result.$ === 'Ok') {
+					var pp = result.a;
+					var updated = function () {
+						var _n2 = pp.request;
+						if (_n2.$ === 'Nothing') {
+							return model;
+						} else {
+							var catalogRequest = _n2.a;
+							return (!_Utils_eq(model.currentPage, catalogRequest.page)) ? model : _Utils_update(
+								model,
+								{
+									currentPage: catalogRequest.page,
+									error: elm$core$Maybe$Nothing,
+									products: elm$core$Maybe$Just(pp.products),
+									totalPages: pp.totalPages
+								});
+						}
+					}();
+					return _Utils_Tuple2(updated, elm$core$Platform$Cmd$none);
+				} else {
+					var e = result.a;
+					var updated = _Utils_update(
+						model,
+						{
+							error: elm$core$Maybe$Just(
+								author$project$CatalogPage$Update$toString(e)),
+							products: elm$core$Maybe$Nothing
+						});
+					return _Utils_Tuple2(updated, elm$core$Platform$Cmd$none);
+				}
+		}
+	});
+var author$project$Model$ProductDetailPage = function (a) {
+	return {$: 'ProductDetailPage', a: a};
+};
+var author$project$Model$ShowCartPage = {$: 'ShowCartPage'};
+var author$project$Message$ProductDetailPageMsg = function (a) {
+	return {$: 'ProductDetailPageMsg', a: a};
+};
+var author$project$ProductDetailPage$Message$LoadProduct = function (a) {
+	return {$: 'LoadProduct', a: a};
+};
+var author$project$ProductDetailPage$Message$PassedSlowLoadThreshold = {$: 'PassedSlowLoadThreshold'};
+var author$project$ProductDetailPage$Model$Loading = {$: 'Loading'};
+var elm$core$Process$sleep = _Process_sleep;
+var author$project$ProductDetailPage$Model$init = function (id) {
+	return _Utils_Tuple2(
+		author$project$ProductDetailPage$Model$Loading,
+		elm$core$Platform$Cmd$batch(
+			_List_fromArray(
+				[
+					A2(
+					elm$core$Task$perform,
+					function (_n0) {
+						return author$project$Message$ProductDetailPageMsg(
+							author$project$ProductDetailPage$Message$LoadProduct(id));
+					},
+					elm$time$Time$here),
+					A2(
+					elm$core$Task$perform,
+					function (_n1) {
+						return author$project$Message$ProductDetailPageMsg(author$project$ProductDetailPage$Message$PassedSlowLoadThreshold);
+					},
+					elm$core$Process$sleep(500))
+				])));
+};
+var author$project$ProductDetailPage$Model$Failed = function (a) {
+	return {$: 'Failed', a: a};
+};
+var author$project$ProductDetailPage$Model$Loaded = function (a) {
+	return {$: 'Loaded', a: a};
+};
+var author$project$ProductDetailPage$Model$LoadingSlowly = {$: 'LoadingSlowly'};
+var author$project$ProductDetailPage$Message$ProductFetched = function (a) {
+	return {$: 'ProductFetched', a: a};
+};
+var author$project$ProductDetailPage$Update$fetchProduct = function (id) {
+	return A2(
+		elm$core$Platform$Cmd$map,
+		author$project$Message$ProductDetailPageMsg,
+		elm$http$Http$get(
+			{
+				expect: A2(eriktim$elm_protocol_buffers$Protobuf$Decode$expectBytes, author$project$ProductDetailPage$Message$ProductFetched, author$project$Catalog$productResponseDecoder),
+				url: 'http://localhost:8080/product?uuid=' + id
+			}));
+};
+var author$project$ProductDetailPage$Update$toString = function (error) {
+	switch (error.$) {
+		case 'BadUrl':
+			var url = error.a;
+			return url + ' is bad';
+		case 'Timeout':
+			return 'Timeout';
+		case 'NetworkError':
+			return 'Network Error';
+		case 'BadStatus':
+			var status = error.a;
+			return elm$core$String$fromInt(status) + ' Status';
+		default:
+			var msg = error.a;
+			return msg;
+	}
+};
+var author$project$ProductDetailPage$Update$update = F2(
+	function (msg, model) {
+		var _n0 = _Utils_Tuple2(msg, model);
+		switch (_n0.a.$) {
+			case 'PassedSlowLoadThreshold':
+				if (_n0.b.$ === 'Loading') {
+					var _n1 = _n0.a;
+					var _n2 = _n0.b;
+					return _Utils_Tuple2(author$project$ProductDetailPage$Model$LoadingSlowly, elm$core$Platform$Cmd$none);
+				} else {
+					var _n3 = _n0.a;
+					return _Utils_Tuple2(model, elm$core$Platform$Cmd$none);
+				}
+			case 'ProductFetched':
+				var result = _n0.a.a;
+				if (result.$ === 'Ok') {
+					var p = result.a;
+					return _Utils_Tuple2(
+						author$project$ProductDetailPage$Model$Loaded(p),
+						elm$core$Platform$Cmd$none);
+				} else {
+					var e = result.a;
+					return _Utils_Tuple2(
+						author$project$ProductDetailPage$Model$Failed(
+							author$project$ProductDetailPage$Update$toString(e)),
+						elm$core$Platform$Cmd$none);
+				}
+			default:
+				var id = _n0.a.a;
+				return _Utils_Tuple2(
+					model,
+					author$project$ProductDetailPage$Update$fetchProduct(id));
+		}
+	});
+var author$project$Update$update = F2(
+	function (msg, model) {
+		var _n0 = _Utils_Tuple2(msg, model.content);
+		_n0$6:
+		while (true) {
+			switch (_n0.a.$) {
+				case 'ProductDetailPageMsg':
+					if (_n0.b.$ === 'ProductDetailPage') {
+						var subMsg = _n0.a.a;
+						var mdl = _n0.b.a;
+						var _n1 = A2(author$project$ProductDetailPage$Update$update, subMsg, mdl);
+						var updatedModel = _n1.a;
+						var cmd = _n1.b;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									content: author$project$Model$ProductDetailPage(updatedModel)
+								}),
+							cmd);
+					} else {
+						break _n0$6;
+					}
+				case 'CatalogPageMsg':
+					if (_n0.b.$ === 'CatalogPage') {
+						var subMsg = _n0.a.a;
+						var mdl = _n0.b.a;
+						var _n2 = A2(author$project$CatalogPage$Update$update, subMsg, mdl);
+						var updatedModel = _n2.a;
+						var cmd = _n2.b;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									content: author$project$Model$CatalogPage(updatedModel)
+								}),
+							cmd);
+					} else {
+						break _n0$6;
+					}
+				case 'CartPageMsg':
+					var subMsg = _n0.a.a;
+					var _n3 = A2(author$project$CartPage$Update$update, subMsg, model.cart);
+					var updatedModel = _n3.a;
+					var cmd = _n3.b;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{cart: updatedModel}),
+						cmd);
+				case 'ShowCartPageMsg':
+					var _n4 = _n0.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{content: author$project$Model$ShowCartPage}),
+						elm$core$Platform$Cmd$none);
+				case 'ShowCatalogPage':
+					var _n5 = _n0.a;
+					var _n6 = author$project$CatalogPage$Model$init;
+					var catalogModel = _n6.a;
+					var catalogCmd = _n6.b;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								content: author$project$Model$CatalogPage(catalogModel)
+							}),
+						catalogCmd);
+				default:
+					var id = _n0.a.a;
+					var _n7 = author$project$ProductDetailPage$Model$init(id);
+					var updatedModel = _n7.a;
+					var cmd = _n7.b;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								content: author$project$Model$ProductDetailPage(updatedModel)
+							}),
+						cmd);
+			}
+		}
+		return _Utils_Tuple2(model, elm$core$Platform$Cmd$none);
+	});
+var author$project$CartPage$View$itemsInCartInStock = function (cart) {
+	var ls = A2(
+		elm$core$List$map,
+		function (e) {
+			return e.inStock ? 1 : 0;
+		},
+		cart.positions);
+	return A3(elm$core$List$foldl, elm$core$Basics$add, 0, ls);
+};
+var elm$core$Basics$not = _Basics_not;
+var author$project$CartPage$View$itemsInCartOutOfStock = function (cart) {
+	var ls = A2(
+		elm$core$List$map,
+		function (e) {
+			return (!e.inStock) ? 1 : 0;
+		},
+		cart.positions);
+	return A3(elm$core$List$foldl, elm$core$Basics$add, 0, ls);
+};
+var author$project$CartPage$View$itemsInCart = function (maybeOrderedCart) {
+	if (maybeOrderedCart.$ === 'Cart') {
+		var cart = maybeOrderedCart.a;
+		var outOfStock = author$project$CartPage$View$itemsInCartOutOfStock(cart);
+		var inStock = author$project$CartPage$View$itemsInCartInStock(cart);
+		return (!outOfStock) ? elm$core$String$fromInt(inStock) : (elm$core$String$fromInt(inStock + outOfStock) + ('-' + elm$core$String$fromInt(outOfStock)));
+	} else {
+		return '0';
+	}
+};
+var author$project$Message$ShowCartPageMsg = {$: 'ShowCartPageMsg'};
+var author$project$Message$ShowCatalogPage = {$: 'ShowCatalogPage'};
+var author$project$CartPage$Message$OrderCart = {$: 'OrderCart'};
+var author$project$CartPage$Message$ChangeProductQuantity = F2(
+	function (a, b) {
+		return {$: 'ChangeProductQuantity', a: a, b: b};
+	});
+var author$project$CatalogPage$View$formatPrice = function (price) {
+	return elm$core$String$fromInt((price / 100) | 0) + '€';
+};
+var elm$core$String$foldr = _String_foldr;
+var elm$core$String$toList = function (string) {
+	return A3(elm$core$String$foldr, elm$core$List$cons, _List_Nil, string);
+};
+var author$project$CatalogPage$View$reduceUuid = function (uuid) {
+	return A3(
+		elm$core$List$foldl,
+		F2(
+			function (x, a) {
+				return x + a;
+			}),
+		0,
+		A2(
+			elm$core$List$map,
+			elm$core$Char$toCode,
+			elm$core$String$toList(uuid)));
+};
+var elm$core$Basics$modBy = _Basics_modBy;
+var author$project$CatalogPage$View$productImage = F3(
+	function (uuid, width, height) {
+		return 'https://picsum.photos/id/' + (elm$core$String$fromInt(
+			A2(
+				elm$core$Basics$modBy,
+				50,
+				author$project$CatalogPage$View$reduceUuid(uuid))) + ('/' + (elm$core$String$fromInt(width) + ('/' + elm$core$String$fromInt(height)))));
+	});
+var elm$json$Json$Decode$map = _Json_map1;
+var elm$json$Json$Decode$map2 = _Json_map2;
+var elm$json$Json$Decode$succeed = _Json_succeed;
+var elm$virtual_dom$VirtualDom$toHandlerInt = function (handler) {
+	switch (handler.$) {
+		case 'Normal':
+			return 0;
+		case 'MayStopPropagation':
+			return 1;
+		case 'MayPreventDefault':
+			return 2;
+		default:
+			return 3;
+	}
+};
+var elm$html$Html$button = _VirtualDom_node('button');
+var elm$html$Html$i = _VirtualDom_node('i');
+var elm$html$Html$img = _VirtualDom_node('img');
+var elm$html$Html$li = _VirtualDom_node('li');
+var elm$html$Html$span = _VirtualDom_node('span');
+var elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
+var elm$html$Html$text = elm$virtual_dom$VirtualDom$text;
+var elm$json$Json$Encode$string = _Json_wrap;
+var elm$html$Html$Attributes$stringProperty = F2(
+	function (key, string) {
+		return A2(
+			_VirtualDom_property,
+			key,
+			elm$json$Json$Encode$string(string));
+	});
+var elm$html$Html$Attributes$class = elm$html$Html$Attributes$stringProperty('className');
+var elm$json$Json$Encode$bool = _Json_wrap;
+var elm$html$Html$Attributes$boolProperty = F2(
+	function (key, bool) {
+		return A2(
+			_VirtualDom_property,
+			key,
+			elm$json$Json$Encode$bool(bool));
+	});
+var elm$html$Html$Attributes$disabled = elm$html$Html$Attributes$boolProperty('disabled');
+var elm$html$Html$Attributes$src = function (url) {
+	return A2(
+		elm$html$Html$Attributes$stringProperty,
+		'src',
+		_VirtualDom_noJavaScriptOrHtmlUri(url));
+};
+var elm$virtual_dom$VirtualDom$Normal = function (a) {
+	return {$: 'Normal', a: a};
+};
+var elm$virtual_dom$VirtualDom$on = _VirtualDom_on;
+var elm$html$Html$Events$on = F2(
+	function (event, decoder) {
+		return A2(
+			elm$virtual_dom$VirtualDom$on,
+			event,
+			elm$virtual_dom$VirtualDom$Normal(decoder));
+	});
+var elm$html$Html$Events$onClick = function (msg) {
+	return A2(
+		elm$html$Html$Events$on,
+		'click',
+		elm$json$Json$Decode$succeed(msg));
+};
+var author$project$CartPage$View$renderCartItem = function (item) {
+	var stockText = (!item.inStock) ? elm$html$Html$text('Out of Stock') : ((!item.moreInStock) ? elm$html$Html$text('All stock in cart') : elm$html$Html$text(''));
+	var quantity = item.quantity;
+	var outOfStock = !item.inStock;
+	var moreInStock = item.moreInStock;
+	var inStock = item.inStock;
+	return A2(
+		elm$html$Html$li,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('mdl-list__item mdl-list__item--two-line')
+			]),
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$span,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-list__item-primary-content')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$img,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('custom-list-image'),
+								elm$html$Html$Attributes$src(
+								A3(author$project$CatalogPage$View$productImage, item.productID, 100, 50))
+							]),
+						_List_Nil),
+						A2(
+						elm$html$Html$span,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-list__item-sub-title')
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text(
+								'price: ' + author$project$CatalogPage$View$formatPrice(item.price))
+							]))
+					])),
+				A2(
+				elm$html$Html$span,
+				_List_Nil,
+				_List_fromArray(
+					[
+						stockText,
+						A2(
+						elm$html$Html$button,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--fab mdl-button--colored'),
+								elm$html$Html$Events$onClick(
+								author$project$Message$CartPageMsg(
+									A2(author$project$CartPage$Message$ChangeProductQuantity, item.productID, quantity - 1)))
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$i,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('material-icons')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('remove')
+									]))
+							])),
+						A2(
+						elm$html$Html$span,
+						_List_Nil,
+						_List_fromArray(
+							[
+								elm$html$Html$text(
+								elm$core$String$fromInt(quantity))
+							])),
+						A2(
+						elm$html$Html$button,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--fab mdl-button--colored'),
+								elm$html$Html$Events$onClick(
+								author$project$Message$CartPageMsg(
+									A2(author$project$CartPage$Message$ChangeProductQuantity, item.productID, quantity + 1))),
+								elm$html$Html$Attributes$disabled(!moreInStock)
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$i,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('material-icons')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('add')
+									]))
+							]))
+					]))
+			]));
+};
+var elm$core$List$append = F2(
+	function (xs, ys) {
+		if (!ys.b) {
+			return xs;
+		} else {
+			return A3(elm$core$List$foldr, elm$core$List$cons, ys, xs);
+		}
+	});
+var elm$html$Html$div = _VirtualDom_node('div');
+var elm$html$Html$h2 = _VirtualDom_node('h2');
+var elm$html$Html$ul = _VirtualDom_node('ul');
+var author$project$CartPage$View$view = function (model) {
+	var _n0 = model.cart;
+	if (_n0.$ === 'Cart') {
+		var cart = _n0.a;
+		var tail = _List_fromArray(
+			[
+				A2(
+				elm$html$Html$li,
+				_List_Nil,
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$button,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent'),
+								elm$html$Html$Events$onClick(
+								author$project$Message$CartPageMsg(author$project$CartPage$Message$OrderCart))
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text('Order Now')
+							]))
+					]))
+			]);
+		var head = A2(
+			elm$core$List$map,
+			function (l) {
+				return author$project$CartPage$View$renderCartItem(l);
+			},
+			cart.positions);
+		var error = function () {
+			var _n1 = model.error;
+			if (_n1.$ === 'Nothing') {
+				return elm$html$Html$text('');
+			} else {
+				var e = _n1.a;
+				return elm$html$Html$text(e);
+			}
+		}();
+		return A2(
+			elm$html$Html$div,
+			_List_Nil,
+			_List_fromArray(
+				[
+					error,
+					A2(
+					elm$html$Html$ul,
+					_List_fromArray(
+						[
+							elm$html$Html$Attributes$class('product-list mdl-list')
+						]),
+					A2(elm$core$List$append, head, tail))
+				]));
+	} else {
+		return A2(
+			elm$html$Html$h2,
+			_List_Nil,
+			_List_fromArray(
+				[
+					elm$html$Html$text('Cart ordered sucessfully')
+				]));
+	}
+};
+var author$project$CatalogPage$Message$NextPage = {$: 'NextPage'};
+var author$project$CatalogPage$Message$PreviousPage = {$: 'PreviousPage'};
+var author$project$CatalogPage$Message$SortByName = {$: 'SortByName'};
+var author$project$CatalogPage$Message$SortByPrice = {$: 'SortByPrice'};
+var author$project$CatalogPage$Message$SortByUuid = {$: 'SortByUuid'};
+var author$project$CatalogPage$Message$DisableFilterByPrefix = {$: 'DisableFilterByPrefix'};
+var author$project$CatalogPage$Message$EnableFilterByPrefix = {$: 'EnableFilterByPrefix'};
+var author$project$CatalogPage$View$filterProductsButton = F2(
+	function (active, label) {
+		return active ? A2(
+			elm$html$Html$button,
+			_List_fromArray(
+				[
+					elm$html$Html$Attributes$class('mdl-button mdl-button--raised mdl-button--accent'),
+					elm$html$Html$Events$onClick(
+					author$project$Message$CatalogPageMsg(author$project$CatalogPage$Message$DisableFilterByPrefix))
+				]),
+			_List_fromArray(
+				[
+					elm$html$Html$text(label)
+				])) : A2(
+			elm$html$Html$button,
+			_List_fromArray(
+				[
+					elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--raised mdl-button--colored'),
+					elm$html$Html$Events$onClick(
+					author$project$Message$CatalogPageMsg(author$project$CatalogPage$Message$EnableFilterByPrefix))
+				]),
+			_List_fromArray(
+				[
+					elm$html$Html$text(label)
+				]));
+	});
+var author$project$CatalogPage$Message$GoToPage = function (a) {
+	return {$: 'GoToPage', a: a};
+};
+var author$project$CatalogPage$View$pageLoader = function (str) {
+	return author$project$Message$CatalogPageMsg(
+		author$project$CatalogPage$Message$GoToPage(str));
+};
+var author$project$CatalogPage$Message$SetFilterPrefix = function (a) {
+	return {$: 'SetFilterPrefix', a: a};
+};
+var author$project$CatalogPage$View$prefixFilter = function (str) {
+	return author$project$Message$CatalogPageMsg(
+		author$project$CatalogPage$Message$SetFilterPrefix(str));
+};
+var author$project$CatalogPage$View$addToCartButton = function (uuid) {
+	return A2(
+		elm$html$Html$button,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent'),
+				elm$html$Html$Events$onClick(
+				author$project$Message$CartPageMsg(
+					A2(author$project$CartPage$Message$ChangeProductQuantity, uuid, 1)))
+			]),
+		_List_fromArray(
+			[
+				elm$html$Html$text('add to cart')
+			]));
+};
+var author$project$Message$ShowProductDetailPage = function (a) {
+	return {$: 'ShowProductDetailPage', a: a};
+};
+var author$project$CatalogPage$View$showProductButton = function (productID) {
+	return A2(
+		elm$html$Html$button,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--raised mdl-button--colored'),
+				elm$html$Html$Events$onClick(
+				author$project$Message$ShowProductDetailPage(productID))
+			]),
+		_List_fromArray(
+			[
+				elm$html$Html$text('show Details')
+			]));
+};
+var author$project$CatalogPage$View$renderProduct = function (product) {
+	return A2(
+		elm$html$Html$li,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('mdl-list__item mdl-list__item--two-line')
+			]),
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$span,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-list__item-primary-content')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$img,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('custom-list-image'),
+								elm$html$Html$Attributes$src(
+								A3(author$project$CatalogPage$View$productImage, product.id, 100, 50))
+							]),
+						_List_Nil),
+						A2(
+						elm$html$Html$span,
+						_List_Nil,
+						_List_fromArray(
+							[
+								elm$html$Html$text(product.name)
+							])),
+						A2(
+						elm$html$Html$span,
+						_List_fromArray(
+							[
+								elm$html$Html$Events$onClick(
+								author$project$Message$ProductDetailPageMsg(
+									author$project$ProductDetailPage$Message$LoadProduct(product.id)))
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text(product.name)
+							])),
+						A2(
+						elm$html$Html$span,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-list__item-sub-title')
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text(
+								'price: ' + author$project$CatalogPage$View$formatPrice(product.price))
+							]))
+					])),
+				A2(
+				elm$html$Html$span,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-list__item-secondary-content')
+					]),
+				_List_fromArray(
+					[
+						author$project$CatalogPage$View$showProductButton(product.id)
+					])),
+				A2(
+				elm$html$Html$span,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-list__item-secondary-content')
+					]),
+				_List_fromArray(
+					[
+						author$project$CatalogPage$View$addToCartButton(product.id)
+					]))
+			]));
+};
+var author$project$CatalogPage$View$sortProductsButton = F3(
+	function (click, inactive, label) {
+		return A2(
+			elm$html$Html$button,
+			_List_fromArray(
+				[
+					elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--raised mdl-button--colored'),
+					elm$html$Html$Events$onClick(
+					author$project$Message$CatalogPageMsg(click)),
+					elm$html$Html$Attributes$disabled(inactive)
+				]),
+			_List_fromArray(
+				[
+					elm$html$Html$text(label)
+				]));
+	});
+var elm$html$Html$input = _VirtualDom_node('input');
+var elm$html$Html$Attributes$placeholder = elm$html$Html$Attributes$stringProperty('placeholder');
+var elm$html$Html$Events$alwaysStop = function (x) {
+	return _Utils_Tuple2(x, true);
+};
+var elm$virtual_dom$VirtualDom$MayStopPropagation = function (a) {
+	return {$: 'MayStopPropagation', a: a};
+};
+var elm$html$Html$Events$stopPropagationOn = F2(
+	function (event, decoder) {
+		return A2(
+			elm$virtual_dom$VirtualDom$on,
+			event,
+			elm$virtual_dom$VirtualDom$MayStopPropagation(decoder));
+	});
+var elm$json$Json$Decode$field = _Json_decodeField;
+var elm$json$Json$Decode$at = F2(
+	function (fields, decoder) {
+		return A3(elm$core$List$foldr, elm$json$Json$Decode$field, decoder, fields);
+	});
+var elm$json$Json$Decode$string = _Json_decodeString;
+var elm$html$Html$Events$targetValue = A2(
+	elm$json$Json$Decode$at,
+	_List_fromArray(
+		['target', 'value']),
+	elm$json$Json$Decode$string);
+var elm$html$Html$Events$onInput = function (tagger) {
+	return A2(
+		elm$html$Html$Events$stopPropagationOn,
+		'input',
+		A2(
+			elm$json$Json$Decode$map,
+			elm$html$Html$Events$alwaysStop,
+			A2(elm$json$Json$Decode$map, tagger, elm$html$Html$Events$targetValue)));
+};
+var author$project$CatalogPage$View$view = function (cp) {
+	var sorting = cp.sorting;
+	var uuidDisabled = sorting === 'uuid';
+	var priceDisabled = sorting === 'price';
+	var prevEnabled = cp.currentPage > 0;
+	var pp = function () {
+		var _n0 = cp.products;
+		if (_n0.$ === 'Nothing') {
+			return _List_Nil;
+		} else {
+			var products = _n0.a;
+			return A2(
+				elm$core$List$map,
+				function (l) {
+					return author$project$CatalogPage$View$renderProduct(l);
+				},
+				products);
+		}
+	}();
+	var pagesText = (!cp.totalPages) ? elm$html$Html$text(' No luck! ') : elm$html$Html$text(
+		' Page ' + (elm$core$String$fromInt(cp.currentPage + 1) + (' from ' + elm$core$String$fromInt(cp.totalPages))));
+	var nextEnabled = _Utils_cmp(cp.currentPage, cp.totalPages - 1) < 0;
+	var nameDisabled = sorting === 'name';
+	var filtering = cp.filtering;
+	var prefixDisabled = filtering === 'prefix';
+	return A2(
+		elm$html$Html$div,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('mdl-grid')
+			]),
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$div,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-cell mdl-cell--12-col')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$button,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--fab mdl-button--colored'),
+								elm$html$Html$Events$onClick(
+								author$project$Message$CatalogPageMsg(author$project$CatalogPage$Message$PreviousPage)),
+								elm$html$Html$Attributes$disabled(!prevEnabled)
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$i,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('material-icons')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('remove')
+									]))
+							])),
+						A2(
+						elm$html$Html$span,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-title custom-page-number')
+							]),
+						_List_fromArray(
+							[
+								pagesText,
+								A2(
+								elm$html$Html$input,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('custom-go-to-page'),
+										elm$html$Html$Attributes$placeholder('Go to page'),
+										elm$html$Html$Events$onInput(author$project$CatalogPage$View$pageLoader)
+									]),
+								_List_Nil)
+							])),
+						A2(
+						elm$html$Html$button,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-button mdl-js-button mdl-button--fab mdl-button--colored'),
+								elm$html$Html$Events$onClick(
+								author$project$Message$CatalogPageMsg(author$project$CatalogPage$Message$NextPage)),
+								elm$html$Html$Attributes$disabled(!nextEnabled)
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$i,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('material-icons')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('add')
+									]))
+							])),
+						A2(
+						elm$html$Html$span,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('custom-sorting')
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text('Sort by '),
+								A3(author$project$CatalogPage$View$sortProductsButton, author$project$CatalogPage$Message$SortByName, nameDisabled, 'Name'),
+								A3(author$project$CatalogPage$View$sortProductsButton, author$project$CatalogPage$Message$SortByUuid, uuidDisabled, 'Uuid'),
+								A3(author$project$CatalogPage$View$sortProductsButton, author$project$CatalogPage$Message$SortByPrice, priceDisabled, 'Price')
+							])),
+						A2(
+						elm$html$Html$span,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('custom-sorting')
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text('Filter by '),
+								A2(author$project$CatalogPage$View$filterProductsButton, prefixDisabled, 'Prefix'),
+								A2(
+								elm$html$Html$input,
+								_List_fromArray(
+									[
+										elm$html$Html$Events$onInput(author$project$CatalogPage$View$prefixFilter),
+										elm$html$Html$Attributes$disabled(!prefixDisabled)
+									]),
+								_List_Nil)
+							]))
+					])),
+				A2(
+				elm$html$Html$ul,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('product-list mdl-list')
+					]),
+				pp)
+			]));
+};
+var elm$html$Html$h1 = _VirtualDom_node('h1');
+var author$project$ProductDetailPage$View$view = function (model) {
+	switch (model.$) {
+		case 'Loading':
+			return elm$html$Html$text('');
+		case 'LoadingSlowly':
+			return elm$html$Html$text('loading...');
+		case 'Loaded':
+			var product = model.a;
+			return A2(
+				elm$html$Html$div,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-grid')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$div,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-cell mdl-cell--12-col')
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$h1,
+								_List_Nil,
+								_List_fromArray(
+									[
+										elm$html$Html$text(product.name)
+									]))
+							])),
+						A2(
+						elm$html$Html$div,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-cell mdl-cell--8-col')
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$img,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('custom-detail-image'),
+										elm$html$Html$Attributes$src(
+										A3(author$project$CatalogPage$View$productImage, product.id, 400, 200))
+									]),
+								_List_Nil)
+							])),
+						A2(
+						elm$html$Html$div,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-cell mdl-cell--4-col')
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$span,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('custom-detail-block')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('id: ' + product.id)
+									])),
+								A2(
+								elm$html$Html$span,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('mdl-typography--headline custom-detail-block')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text(product.description)
+									])),
+								A2(
+								elm$html$Html$span,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('custom-detail-block')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text(product.longtext)
+									])),
+								A2(
+								elm$html$Html$span,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('mdl-typography--display-1 custom-detail-block')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text(
+										author$project$CatalogPage$View$formatPrice(product.price))
+									])),
+								A2(
+								elm$html$Html$span,
+								_List_Nil,
+								_List_fromArray(
+									[
+										author$project$CatalogPage$View$addToCartButton(product.id)
+									]))
+							]))
+					]));
+		default:
+			var err = model.a;
+			return elm$html$Html$text(err);
+	}
+};
+var author$project$View$renderContent = function (model) {
+	var _n0 = model.content;
+	switch (_n0.$) {
+		case 'CatalogPage':
+			var mdl = _n0.a;
+			return author$project$CatalogPage$View$view(mdl);
+		case 'ProductDetailPage':
+			var mdl = _n0.a;
+			return author$project$ProductDetailPage$View$view(mdl);
+		case 'ShowCartPage':
+			return author$project$CartPage$View$view(model.cart);
+		case 'OrderSuccessfulPage':
+			return A2(
+				elm$html$Html$h1,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Order was successful')
+					]));
+		default:
+			return A2(
+				elm$html$Html$h1,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Ordering failed')
+					]));
+	}
+};
+var elm$html$Html$header = _VirtualDom_node('header');
+var elm$virtual_dom$VirtualDom$attribute = F2(
+	function (key, value) {
+		return A2(
+			_VirtualDom_attribute,
+			_VirtualDom_noOnOrFormAction(key),
+			_VirtualDom_noJavaScriptOrHtmlUri(value));
+	});
+var elm$html$Html$Attributes$attribute = elm$virtual_dom$VirtualDom$attribute;
+var elm$html$Html$Attributes$id = elm$html$Html$Attributes$stringProperty('id');
+var author$project$View$view = function (model) {
+	var _n0 = function () {
+		var _n1 = model.content;
+		switch (_n1.$) {
+			case 'CatalogPage':
+				return _Utils_Tuple2(false, true);
+			case 'ProductDetailPage':
+				return _Utils_Tuple2(false, false);
+			case 'ShowCartPage':
+				return _Utils_Tuple2(true, false);
+			case 'OrderSuccessfulPage':
+				return _Utils_Tuple2(false, false);
+			default:
+				return _Utils_Tuple2(false, false);
+		}
+	}();
+	var showingCart = _n0.a;
+	var showingCatalog = _n0.b;
+	return A2(
+		elm$html$Html$div,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('mdl-layout mdl-layout--fixed-header')
+			]),
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$header,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-layout__header mdl-layout__header--waterfall custom-header')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$div,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('mdl-layout__header-row custom-header-row')
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$span,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('mdl-layout__title')
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('Event Thingy Store')
+									])),
+								A2(
+								elm$html$Html$div,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('mdl-layout-spacer')
+									]),
+								_List_Nil),
+								A2(
+								elm$html$Html$div,
+								_List_Nil,
+								_List_fromArray(
+									[
+										A2(
+										elm$html$Html$span,
+										_List_fromArray(
+											[
+												elm$html$Html$Attributes$class('mdl-badge custom-header-cart'),
+												A2(
+												elm$html$Html$Attributes$attribute,
+												'data-badge',
+												author$project$CartPage$View$itemsInCart(model.cart.cart)),
+												elm$html$Html$Events$onClick(author$project$Message$ShowCartPageMsg)
+											]),
+										_List_fromArray(
+											[
+												elm$html$Html$text('Cart')
+											]))
+									])),
+								A2(
+								elm$html$Html$button,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('mdl-button mdl-button--raised mdl-button--accent'),
+										elm$html$Html$Events$onClick(author$project$Message$ShowCartPageMsg),
+										elm$html$Html$Attributes$disabled(showingCart)
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('show Cart')
+									])),
+								A2(
+								elm$html$Html$button,
+								_List_fromArray(
+									[
+										elm$html$Html$Attributes$class('mdl-button mdl-button--raised mdl-button--accent'),
+										elm$html$Html$Events$onClick(author$project$Message$ShowCatalogPage),
+										elm$html$Html$Attributes$disabled(showingCatalog)
+									]),
+								_List_fromArray(
+									[
+										elm$html$Html$text('show products')
+									]))
+							]))
+					])),
+				A2(
+				elm$html$Html$div,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('custom-header-error')
+					]),
+				_List_fromArray(
+					[
+						elm$html$Html$text(model.error)
+					])),
+				A2(
+				elm$html$Html$div,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('mdl-layout__content'),
+						elm$html$Html$Attributes$id('main')
+					]),
+				_List_fromArray(
+					[
+						author$project$View$renderContent(model)
+					]))
+			]));
+};
+var elm$browser$Browser$External = function (a) {
+	return {$: 'External', a: a};
+};
+var elm$browser$Browser$Internal = function (a) {
+	return {$: 'Internal', a: a};
+};
+var elm$browser$Browser$Dom$NotFound = function (a) {
+	return {$: 'NotFound', a: a};
+};
+var elm$core$Basics$never = function (_n0) {
+	never:
+	while (true) {
+		var nvr = _n0.a;
+		var $temp$_n0 = nvr;
+		_n0 = $temp$_n0;
+		continue never;
+	}
+};
 var elm$core$String$length = _String_length;
 var elm$core$String$slice = _String_slice;
 var elm$core$String$dropLeft = F2(
@@ -5015,7 +8872,6 @@ var elm$core$String$left = F2(
 		return (n < 1) ? '' : A3(elm$core$String$slice, 0, n, string);
 	});
 var elm$core$String$contains = _String_contains;
-var elm$core$String$toInt = _String_toInt;
 var elm$url$Url$Url = F6(
 	function (protocol, host, port_, path, query, fragment) {
 		return {fragment: fragment, host: host, path: path, port_: port_, protocol: protocol, query: query};
@@ -5124,6 +8980,6 @@ var elm$url$Url$fromString = function (str) {
 };
 var elm$browser$Browser$element = _Browser_element;
 var author$project$Main$main = elm$browser$Browser$element(
-	{init: author$project$Main$init, subscriptions: author$project$Main$subscriptions, update: author$project$Main$update, view: author$project$Main$view});
+	{init: author$project$Model$init, subscriptions: author$project$Main$subscriptions, update: author$project$Update$update, view: author$project$View$view});
 _Platform_export({'Main':{'init':author$project$Main$main(
 	elm$json$Json$Decode$succeed(_Utils_Tuple0))(0)}});}(this));

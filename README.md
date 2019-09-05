@@ -78,6 +78,12 @@ backend
   - generate request & response & presenter & view_model for http endpoints // https://youtu.be/WpkDN78P884?t=2218
 - extend simba to create bridges
   - share events between contexts
+- performance debug
+  - https://www.youtube.com/watch?v=nok0aYiGiYA
+  - https://golang.org/pkg/net/http/pprof/
+  - go tool pprof -http=:8081 cpu.pprof
+  - go tool pprof -http=:8081 mem.pprof
+  - go tool trace trace.out
 - CORS
   - configurable api domain in frontend
   - configurable spa domain in backend

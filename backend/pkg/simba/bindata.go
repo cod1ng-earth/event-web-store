@@ -61,7 +61,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 {{ range .Bridges }}
-	"{{ .PkgPath }}/published"
+	{{ .Name }} "{{ .PkgPath }}/public"
 {{ end }}
 )
 
@@ -296,17 +296,17 @@ func (c *context) bridge{{ .Name | title }}() {
 		case msg := <-partition.Messages():
 //			log.Printf("recieved message with offset %v", msg.Offset)
 
-			cc := {{ .Name }}.{{ .Name | title }}Messages{}
+			cc := {{ .Name }}.TopicMessage{}
 			err := proto.Unmarshal(msg.Value, &cc)
 			if err != nil {
 				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 			}
 
-			switch x := cc.Get{{ .Name | title }}Message().(type) {
+			switch x := cc.GetMessages().(type) {
 
 			{{$bridge := .}}
 			{{ range .MessageNames }}
-			case *{{ $bridge.Name }}.{{ $bridge.Name | title }}Messages_{{ . | title }}:
+			case *{{ $bridge.Name }}.TopicMessage_{{ . | title }}:
 				if err := translate{{ $bridge.Name | title }}{{ . | title }}(c, model, msg.Offset, cc.Get{{ . | title }}()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
@@ -410,16 +410,16 @@ func (c *context) read() (*model, func()) {
 
 {{ if .Batch }}
 func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := {{ .Name | title }}Messages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.Get{{ .Name | title }}Message().(type) {
+	switch x := cc.GetMessages().(type) {
 
 	{{ range .MessageNames }}
-	case *{{ $.Name | title }}Messages_{{ . | title }}:
+	case *TopicMessage_{{ . | title }}:
 		return batchUpdateModel{{ . | title }}(model, msg.Offset, cc.Get{{ . | title }}())
 	{{ end }}
 
@@ -433,16 +433,16 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 {{ end }}
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := {{ .Name | title }}Messages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.Get{{ .Name | title }}Message().(type) {
+	switch x := cc.GetMessages().(type) {
 
 	{{ range .MessageNames }}
-	case *{{ $.Name | title }}Messages_{{ . | title }}:
+	case *TopicMessage_{{ . | title }}:
 		return updateModel{{ . | title }}(model, msg.Offset, cc.Get{{ . | title }}())
 	{{ end }}
 
@@ -459,8 +459,8 @@ func (c *context) log{{ . | title }}(logMsg *{{ . | title }}) (int32, int64, err
 
 	//log.Printf("log{{ . | title }}");
 
-	change := &{{ $.Name | title }}Messages{
-		{{ $.Name | title }}Message: &{{ $.Name | title }}Messages_{{ . | title }}{
+	change := &TopicMessage{
+		Messages: &TopicMessage_{{ . | title }}{
 			{{ . | title }}: logMsg,
 		},
 	}

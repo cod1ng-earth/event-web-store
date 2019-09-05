@@ -3,8 +3,8 @@ package checkout
 import (
 	"log"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/fulfilment"
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim"
+	fulfilment "github.com/cod1ng-earth/event-web-store/backend/pkg/context/fulfilment/public"
+	pim "github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/public"
 )
 
 func (m *model) getPimOffset() int64 {

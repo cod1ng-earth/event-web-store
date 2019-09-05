@@ -8,12 +8,10 @@ backend/cmd/dev-tools/simba/simba: $(shell find backend/pkg/simba) backend/cmd/d
 	cd backend/cmd/dev-tools/simba && go build
 
 frontend/src/Catalog.elm: backend/pkg/context/catalog/api.proto
-	true
-##	protoc --elm_out=frontend/src --proto_path=backend/pkg/context/catalog/ api.proto
+	protoc --elm_out=frontend/src --proto_path=backend/pkg/context/catalog/ api.proto
 
 frontend/src/Checkout.elm: backend/pkg/context/checkout/api.proto
-	true
-##	protoc --elm_out=frontend/src --proto_path=backend/pkg/checkout/ api.proto
+	protoc --elm_out=frontend/src --proto_path=backend/pkg/context/checkout/ api.proto
 
 
 #protoc -I/usr/local/include -I. \

@@ -48,7 +48,7 @@ func createContextDescription(name string, batch bool, readLock string, bridges 
 	subscribers := []subscriber{}
 	for _, bridge := range bridges {
 		name = path.Base(bridge)
-		messageNames, ok := findMessageNames(filepath.Join("..", name, "published", "topic.proto"))
+		messageNames, ok := findMessageNames(filepath.Join("..", name, "public", "topic.proto"))
 		if !ok {
 			log.Fatalf("topic wrap message not defined in proto file for bridge %v", bridge)
 		}

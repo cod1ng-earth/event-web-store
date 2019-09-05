@@ -1,8 +1,8 @@
 //go:generate protoc --go_out=. topic.proto
 
-package published
+package fulfilment
 
 const (
-	Topic     = "pim_pub"
+	Topic     = "fulfilment_pub"
 	Partition = 0
 )

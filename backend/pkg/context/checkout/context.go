@@ -10,9 +10,9 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/published"
+	pim "github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/public"
 
-	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/fulfilment/published"
+	fulfilment "github.com/cod1ng-earth/event-web-store/backend/pkg/context/fulfilment/public"
 )
 
 const (
@@ -153,15 +153,15 @@ func (c *context) bridgePim() {
 		case msg := <-partition.Messages():
 			//			log.Printf("recieved message with offset %v", msg.Offset)
 
-			cc := pim.PimMessages{}
+			cc := pim.TopicMessage{}
 			err := proto.Unmarshal(msg.Value, &cc)
 			if err != nil {
 				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 			}
 
-			switch x := cc.GetPimMessage().(type) {
+			switch x := cc.GetMessages().(type) {
 
-			case *pim.PimMessages_Product:
+			case *pim.TopicMessage_Product:
 				if err := translatePimProduct(c, model, msg.Offset, cc.GetProduct()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
@@ -199,15 +199,15 @@ func (c *context) bridgeFulfilment() {
 		case msg := <-partition.Messages():
 			//			log.Printf("recieved message with offset %v", msg.Offset)
 
-			cc := fulfilment.FulfilmentMessages{}
+			cc := fulfilment.TopicMessage{}
 			err := proto.Unmarshal(msg.Value, &cc)
 			if err != nil {
 				log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 			}
 
-			switch x := cc.GetFulfilmentMessage().(type) {
+			switch x := cc.GetMessages().(type) {
 
-			case *fulfilment.FulfilmentMessages_StockCorrected:
+			case *fulfilment.TopicMessage_StockCorrected:
 				if err := translateFulfilmentStockCorrected(c, model, msg.Offset, cc.GetStockCorrected()); err != nil {
 					log.Fatalf("failed to translate kafka message $bridge.Name/%v: %s", msg.Offset, err)
 				}
@@ -287,24 +287,24 @@ func (c *context) read() (*model, func()) {
 }
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := CheckoutMessages{}
+	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
 	}
 
-	switch x := cc.GetCheckoutMessage().(type) {
+	switch x := cc.GetMessages().(type) {
 
-	case *CheckoutMessages_ChangeProductQuantity:
+	case *TopicMessage_ChangeProductQuantity:
 		return updateModelChangeProductQuantity(model, msg.Offset, cc.GetChangeProductQuantity())
 
-	case *CheckoutMessages_StockCorrected:
+	case *TopicMessage_StockCorrected:
 		return updateModelStockCorrected(model, msg.Offset, cc.GetStockCorrected())
 
-	case *CheckoutMessages_Product:
+	case *TopicMessage_Product:
 		return updateModelProduct(model, msg.Offset, cc.GetProduct())
 
-	case *CheckoutMessages_OrderCart:
+	case *TopicMessage_OrderCart:
 		return updateModelOrderCart(model, msg.Offset, cc.GetOrderCart())
 
 	case nil:
@@ -319,8 +319,8 @@ func (c *context) logChangeProductQuantity(logMsg *ChangeProductQuantity) (int32
 
 	//log.Printf("logChangeProductQuantity");
 
-	change := &CheckoutMessages{
-		CheckoutMessage: &CheckoutMessages_ChangeProductQuantity{
+	change := &TopicMessage{
+		Messages: &TopicMessage_ChangeProductQuantity{
 			ChangeProductQuantity: logMsg,
 		},
 	}
@@ -341,8 +341,8 @@ func (c *context) logStockCorrected(logMsg *StockCorrected) (int32, int64, error
 
 	//log.Printf("logStockCorrected");
 
-	change := &CheckoutMessages{
-		CheckoutMessage: &CheckoutMessages_StockCorrected{
+	change := &TopicMessage{
+		Messages: &TopicMessage_StockCorrected{
 			StockCorrected: logMsg,
 		},
 	}
@@ -363,8 +363,8 @@ func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
 
 	//log.Printf("logProduct");
 
-	change := &CheckoutMessages{
-		CheckoutMessage: &CheckoutMessages_Product{
+	change := &TopicMessage{
+		Messages: &TopicMessage_Product{
 			Product: logMsg,
 		},
 	}
@@ -385,8 +385,8 @@ func (c *context) logOrderCart(logMsg *OrderCart) (int32, int64, error) {
 
 	//log.Printf("logOrderCart");
 
-	change := &CheckoutMessages{
-		CheckoutMessage: &CheckoutMessages_OrderCart{
+	change := &TopicMessage{
+		Messages: &TopicMessage_OrderCart{
 			OrderCart: logMsg,
 		},
 	}

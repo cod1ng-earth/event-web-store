@@ -5,7 +5,7 @@ import Catalog
 
 
 type SubMsg
-    = GotProducts (Result Http.Error Catalog.CatalogPage)
+    = GotProducts (Result Http.Error Catalog.CatalogResponse)
     | LoadProducts
     | PreviousPage
     | NextPage
