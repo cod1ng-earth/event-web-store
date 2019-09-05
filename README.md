@@ -35,11 +35,11 @@ make run
 ## Required tools for development
 
 - golang
-- air https://github.com/cosmtrek/air
+- air <https://github.com/cosmtrek/air>
 - elm
 - elm-live
 - protoc
-- protoc-gen-elm https://www.npmjs.com/package/protoc-gen-elm
+- protoc-gen-elm <https://www.npmjs.com/package/protoc-gen-elm>
 - docker
 
 ## Features
@@ -75,12 +75,12 @@ backend
   - batch only during start vs dynamic selection
   - [DONE] sync to other contexts before processing commands
   - protobuf vs json
-  - generate request & response & presenter & view_model for http endpoints // https://youtu.be/WpkDN78P884?t=2218
+  - generate request & response & presenter & view_model for http endpoints // <https://youtu.be/WpkDN78P884?t=2218>
 - extend simba to create bridges
   - share events between contexts
 - performance debug
-  - https://www.youtube.com/watch?v=nok0aYiGiYA
-  - https://golang.org/pkg/net/http/pprof/
+  - <https://www.youtube.com/watch?v=nok0aYiGiYA>
+  - <https://golang.org/pkg/net/http/pprof/>
   - go tool pprof -http=:8081 cpu.pprof
   - go tool pprof -http=:8081 mem.pprof
   - go tool trace trace.out
@@ -109,7 +109,7 @@ backend
   - add a confirmation email
   - when triggering an sideeffect, then ensure to do this only once
   - after dirty shutdown wait for ip ttl
-- use https://godoc.org/github.com/golang-collections/go-datastructures/slice/skip#SkipList.ByPosition
+- use <https://godoc.org/github.com/golang-collections/go-datastructures/slice/skip#SkipList.ByPosition>
 - debug
   - tracing via jaeger
   - debugger local
@@ -122,7 +122,7 @@ frontend
 
 - production image
 - remove .uuid
-- use int32 everywhere https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/latest/#known-limitations
+- use int32 everywhere <https://package.elm-lang.org/packages/eriktim/elm-protocol-buffers/latest/#known-limitations>
 - use less & cleanup css classes from html elm
 - [DONE] use protobuf / remove json
 - [DONE] use modules
@@ -134,7 +134,7 @@ frontend
 
 general
 
-- create an uneasy environment https://github.com/Netflix/SimianArmy/tree/master/src/main/resources/scripts
+- create an uneasy environment <https://github.com/Netflix/SimianArmy/tree/master/src/main/resources/scripts>
 - e2e tests
 - add pim
 - add fulfilment
