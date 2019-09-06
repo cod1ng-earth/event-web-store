@@ -18,6 +18,56 @@ const (
 	Partition = 0
 )
 
+type asyncProducer struct {
+	sarama.AsyncProducer
+}
+
+func (c *context) newSyncProducer() (asyncProducer, error) {
+	producer, err := sarama.NewAsyncProducerFromClient(c.client)
+	if err != nil {
+		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
+	}
+	return asyncProducer{
+		AsyncProducer: producer,
+	}, nil
+}
+
+func (p *asyncProducer) awaitClose(f func(error)) sync.WaitGroup {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for err := range p.Errors() {
+			f(err)
+		}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for _ = range p.Successes() {
+		}
+		wg.Done()
+	}()
+	return wg
+}
+
+func (p *asyncProducer) appendProduct(msg *Product) error {
+
+	wrapper := &TopicMessage{
+		Messages: &TopicMessage_Product{
+			Product: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(wrapper)
+	if err != nil {
+		return fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
+	}
+
+	p.Input() <- &sarama.ProducerMessage{Topic: Topic, Value: sarama.ByteEncoder(bytes)}
+
+	return nil
+}
+
 type context struct {
 	doneCh chan struct{}
 

@@ -35,14 +35,18 @@ func (c *context) ImportFile(path string, verbose bool) {
 	}
 	defer f.Close()
 
-	log.Print("pre parseProducts")
-	newProducts := make(chan *Product)
+	producer, err := c.newSyncProducer()
+	if err != nil {
+		log.Fatalf("failed send messages to kafka: %s", err)
+	}
+
+	closed := producer.awaitClose(func(err error) {
+		log.Fatalf("failure to write to kafka: %s", err)
+	})
+
+	newProducts := make(chan *Product, 1000)
 	go parseProducts(f, newProducts)
-	log.Print("post parseProducts")
-
 	for newProduct := range newProducts {
-
-		//log.Print("newProduct := loop")
 
 		oldProduct, found := oldProducts[newProduct.Id]
 
@@ -57,29 +61,25 @@ func (c *context) ImportFile(path string, verbose bool) {
 		}
 
 		// if new or changed -> upsert
-		c.logProduct(newProduct)
-		//_, _, err = c.logProduct(newProduct)
-		if err != nil {
-			log.Fatalf("failed to store product %v: %v", newProduct, err)
-		}
+		producer.appendProduct(newProduct)
 	}
-
 	if verbose {
 		log.Printf("updated and inserted products")
 	}
 
-	// disable Products that existed before but are missing from new
 	for _, oldProduct := range oldProducts {
-		log.Printf("disable %v", oldProduct.Id)
 		oldProduct.Disabled = true
-		c.logProduct(oldProduct)
-		//_, _, err = c.logProduct(oldProduct)
-		if err != nil {
-			log.Fatalf("failed to disable product %v: %v", oldProduct, err)
-		}
+		producer.appendProduct(oldProduct)
 	}
 	if verbose {
 		log.Printf("disabled old products")
+	}
+
+	producer.AsyncClose()
+
+	closed.Wait()
+	if verbose {
+		log.Printf("received ACKs for all messages from kafka")
 	}
 }
 
