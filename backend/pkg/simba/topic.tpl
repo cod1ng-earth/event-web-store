@@ -10,35 +10,40 @@ import (
 )
 
 type asyncProducer struct {
-	sarama.AsyncProducer
+	producer sarama.AsyncProducer
+	wg       sync.WaitGroup
 }
 
-func (c *context) newSyncProducer() (asyncProducer, error) {
+func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
 	producer, err := sarama.NewAsyncProducerFromClient(c.client)
 	if err != nil {
 		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
 	}
-	return asyncProducer{
-		AsyncProducer: producer,
-	}, nil
-}
 
-func (p *asyncProducer) awaitClose(f func(error)) sync.WaitGroup {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		for err := range p.Errors() {
+		for err := range producer.Errors() {
 			f(err)
 		}
 		wg.Done()
 	}()
 	wg.Add(1)
 	go func() {
-		for _ = range p.Successes() {
+		for _ = range producer.Successes() {
 		}
 		wg.Done()
 	}()
-	return wg
+
+	return asyncProducer{
+		producer: producer,
+		wg:       wg,
+	}, nil
+}
+
+func (p *asyncProducer) Close() {
+	p.producer.AsyncClose()
+	p.wg.Wait()
 }
 
 {{ range .MessageNames }}

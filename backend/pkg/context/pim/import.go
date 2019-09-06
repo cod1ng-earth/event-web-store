@@ -11,8 +11,7 @@ import (
 
 func (c *context) ImportFile(path string, verbose bool) {
 
-	log.Print("ImportFile")
-
+	log.Printf("importing %s", path)
 	model, free := c.read()
 
 	log.Print("accessing model")
@@ -29,23 +28,21 @@ func (c *context) ImportFile(path string, verbose bool) {
 		log.Printf("loaded current products")
 	}
 
+	producer, err := c.newSyncProducer(func(err error) {
+		log.Fatalf("failure to write to kafka: %s", err)
+	})
+	if err != nil {
+		log.Fatalf("failed send messages to kafka: %s", err)
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("failed to open import file: %s", err)
 	}
 	defer f.Close()
-
-	producer, err := c.newSyncProducer()
-	if err != nil {
-		log.Fatalf("failed send messages to kafka: %s", err)
-	}
-
-	closed := producer.awaitClose(func(err error) {
-		log.Fatalf("failure to write to kafka: %s", err)
-	})
-
 	newProducts := make(chan *Product, 1000)
 	go parseProducts(f, newProducts)
+
 	for newProduct := range newProducts {
 
 		oldProduct, found := oldProducts[newProduct.Id]
@@ -75,9 +72,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 		log.Printf("disabled old products")
 	}
 
-	producer.AsyncClose()
-
-	closed.Wait()
+	producer.Close()
 	if verbose {
 		log.Printf("received ACKs for all messages from kafka")
 	}
@@ -92,11 +87,13 @@ func parseProducts(r io.Reader, ch chan *Product) {
 			close(ch)
 			return
 		}
+		if err != nil {
+			log.Fatalf("failed to import csv file: %v", err)
+		}
 
 		price, err := strconv.ParseInt(row[7], 10, 64)
 		if err != nil {
-			log.Printf("failed to parse price in row %v: %v", row, err)
-			continue
+			log.Fatalf("failed to parse price in row %v: %v", row, err)
 		}
 
 		ch <- &Product{
