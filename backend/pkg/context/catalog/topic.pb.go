@@ -3,9 +3,11 @@
 
 package catalog
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -16,7 +18,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type TopicMessage struct {
 	// Types that are valid to be assigned to Messages:
@@ -31,16 +33,17 @@ func (m *TopicMessage) Reset()         { *m = TopicMessage{} }
 func (m *TopicMessage) String() string { return proto.CompactTextString(m) }
 func (*TopicMessage) ProtoMessage()    {}
 func (*TopicMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_topic_5573b565d9fa64af, []int{0}
+	return fileDescriptor_7312ad0e4fa171e8, []int{0}
 }
+
 func (m *TopicMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TopicMessage.Unmarshal(m, b)
 }
 func (m *TopicMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_TopicMessage.Marshal(b, m, deterministic)
 }
-func (dst *TopicMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TopicMessage.Merge(dst, src)
+func (m *TopicMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TopicMessage.Merge(m, src)
 }
 func (m *TopicMessage) XXX_Size() int {
 	return xxx_messageInfo_TopicMessage.Size(m)
@@ -75,59 +78,11 @@ func (m *TopicMessage) GetProduct() *Product {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*TopicMessage) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _TopicMessage_OneofMarshaler, _TopicMessage_OneofUnmarshaler, _TopicMessage_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*TopicMessage) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*TopicMessage_Product)(nil),
 	}
-}
-
-func _TopicMessage_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*TopicMessage)
-	// messages
-	switch x := m.Messages.(type) {
-	case *TopicMessage_Product:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Product); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("TopicMessage.Messages has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _TopicMessage_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*TopicMessage)
-	switch tag {
-	case 1: // messages.product
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Product)
-		err := b.DecodeMessage(msg)
-		m.Messages = &TopicMessage_Product{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _TopicMessage_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*TopicMessage)
-	// messages
-	switch x := m.Messages.(type) {
-	case *TopicMessage_Product:
-		s := proto.Size(x.Product)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type Product struct {
@@ -150,16 +105,17 @@ func (m *Product) Reset()         { *m = Product{} }
 func (m *Product) String() string { return proto.CompactTextString(m) }
 func (*Product) ProtoMessage()    {}
 func (*Product) Descriptor() ([]byte, []int) {
-	return fileDescriptor_topic_5573b565d9fa64af, []int{1}
+	return fileDescriptor_7312ad0e4fa171e8, []int{1}
 }
+
 func (m *Product) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Product.Unmarshal(m, b)
 }
 func (m *Product) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Product.Marshal(b, m, deterministic)
 }
-func (dst *Product) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Product.Merge(dst, src)
+func (m *Product) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Product.Merge(m, src)
 }
 func (m *Product) XXX_Size() int {
 	return xxx_messageInfo_Product.Size(m)
@@ -245,9 +201,9 @@ func init() {
 	proto.RegisterType((*Product)(nil), "catalog.Product")
 }
 
-func init() { proto.RegisterFile("topic.proto", fileDescriptor_topic_5573b565d9fa64af) }
+func init() { proto.RegisterFile("topic.proto", fileDescriptor_7312ad0e4fa171e8) }
 
-var fileDescriptor_topic_5573b565d9fa64af = []byte{
+var fileDescriptor_7312ad0e4fa171e8 = []byte{
 	// 268 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x90, 0xcd, 0x4a, 0xf4, 0x30,
 	0x14, 0x86, 0xbf, 0x76, 0x7e, 0xda, 0x9e, 0x7e, 0x8a, 0x04, 0x17, 0x41, 0x5c, 0x94, 0xc1, 0x45,

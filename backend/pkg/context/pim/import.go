@@ -58,7 +58,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 		}
 
 		// if new or changed -> upsert
-		producer.appendProduct(newProduct)
+		producer.logProduct(newProduct)
 	}
 	if verbose {
 		log.Printf("updated and inserted products")
@@ -66,7 +66,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 
 	for _, oldProduct := range oldProducts {
 		oldProduct.Disabled = true
-		producer.appendProduct(oldProduct)
+		producer.logProduct(oldProduct)
 	}
 	if verbose {
 		log.Printf("disabled old products")

@@ -315,90 +315,207 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	}
 }
 
-func (c *context) logChangeProductQuantity(logMsg *ChangeProductQuantity) (int32, int64, error) {
+type asyncProducer struct {
+	producer sarama.AsyncProducer
+	wg       sync.WaitGroup
+}
 
-	//log.Printf("logChangeProductQuantity");
+func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+	producer, err := sarama.NewAsyncProducerFromClient(c.client)
+	if err != nil {
+		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
+	}
 
-	change := &TopicMessage{
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for err := range producer.Errors() {
+			f(err)
+		}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for range producer.Successes() {
+		}
+		wg.Done()
+	}()
+
+	return asyncProducer{
+		producer: producer,
+		wg:       wg,
+	}, nil
+}
+
+func (p *asyncProducer) Close() {
+	p.producer.AsyncClose()
+	p.wg.Wait()
+}
+
+func (c *context) logChangeProductQuantity(msg *ChangeProductQuantity) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
 		Messages: &TopicMessage_ChangeProductQuantity{
-			ChangeProductQuantity: logMsg,
+			ChangeProductQuantity: msg,
 		},
 	}
 
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(topicMsg)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+		return 0, 0, fmt.Errorf("failed to serialize changeProductQuantity change massage: %v", err)
 	}
 
-	msg := &sarama.ProducerMessage{
+	producerMsg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(msg)
+	return c.producer.SendMessage(producerMsg)
 }
 
-func (c *context) logStockCorrected(logMsg *StockCorrected) (int32, int64, error) {
+func (p asyncProducer) logChangeProductQuantity(msg *ChangeProductQuantity) error {
 
-	//log.Printf("logStockCorrected");
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_ChangeProductQuantity{
+			ChangeProductQuantity: msg,
+		},
+	}
 
-	change := &TopicMessage{
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize changeProductQuantity change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	p.producer.Input() <- producerMsg
+
+	return nil
+}
+
+func (c *context) logStockCorrected(msg *StockCorrected) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
 		Messages: &TopicMessage_StockCorrected{
-			StockCorrected: logMsg,
+			StockCorrected: msg,
 		},
 	}
 
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(topicMsg)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+		return 0, 0, fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
 	}
 
-	msg := &sarama.ProducerMessage{
+	producerMsg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(msg)
+	return c.producer.SendMessage(producerMsg)
 }
 
-func (c *context) logProduct(logMsg *Product) (int32, int64, error) {
+func (p asyncProducer) logStockCorrected(msg *StockCorrected) error {
 
-	//log.Printf("logProduct");
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_StockCorrected{
+			StockCorrected: msg,
+		},
+	}
 
-	change := &TopicMessage{
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	p.producer.Input() <- producerMsg
+
+	return nil
+}
+
+func (c *context) logProduct(msg *Product) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
 		Messages: &TopicMessage_Product{
-			Product: logMsg,
+			Product: msg,
 		},
 	}
 
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(topicMsg)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
 	}
 
-	msg := &sarama.ProducerMessage{
+	producerMsg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(msg)
+	return c.producer.SendMessage(producerMsg)
 }
 
-func (c *context) logOrderCart(logMsg *OrderCart) (int32, int64, error) {
+func (p asyncProducer) logProduct(msg *Product) error {
 
-	//log.Printf("logOrderCart");
-
-	change := &TopicMessage{
-		Messages: &TopicMessage_OrderCart{
-			OrderCart: logMsg,
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_Product{
+			Product: msg,
 		},
 	}
 
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(topicMsg)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+		return fmt.Errorf("failed to serialize product change massage: %v", err)
 	}
 
-	msg := &sarama.ProducerMessage{
+	producerMsg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(msg)
+	p.producer.Input() <- producerMsg
+
+	return nil
+}
+
+func (c *context) logOrderCart(msg *OrderCart) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_OrderCart{
+			OrderCart: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize orderCart change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+func (p asyncProducer) logOrderCart(msg *OrderCart) error {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_OrderCart{
+			OrderCart: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize orderCart change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	p.producer.Input() <- producerMsg
+
+	return nil
 }

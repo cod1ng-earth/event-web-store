@@ -9,8 +9,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
-
-	"github.com/openacid/low/size"
 )
 
 const (
@@ -18,67 +16,12 @@ const (
 	Partition = 0
 )
 
-type asyncProducer struct {
-	producer sarama.AsyncProducer
-	wg       *sync.WaitGroup
-}
-
-func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
-	producer, err := sarama.NewAsyncProducerFromClient(c.client)
-	if err != nil {
-		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for err := range producer.Errors() {
-			f(err)
-		}
-		wg.Done()
-	}()
-	wg.Add(1)
-	go func() {
-		for _ = range producer.Successes() {
-		}
-		wg.Done()
-	}()
-
-	return asyncProducer{
-		producer: producer,
-		wg:       &wg,
-	}, nil
-}
-
-func (p *asyncProducer) Close() {
-	p.producer.AsyncClose()
-	p.wg.Wait()
-}
-
-func (p *asyncProducer) appendProduct(msg *Product) error {
-
-	wrapper := &TopicMessage{
-		Messages: &TopicMessage_Product{
-			Product: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(wrapper)
-	if err != nil {
-		return fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
-	}
-
-	p.producer.Input() <- &sarama.ProducerMessage{Topic: Topic, Value: sarama.ByteEncoder(bytes)}
-
-	return nil
-}
-
 type context struct {
 	doneCh chan struct{}
 
 	client   sarama.Client
 	consumer sarama.Consumer
-	producer sarama.AsyncProducer
+	producer sarama.SyncProducer
 
 	batchOffset int64
 
@@ -99,7 +42,7 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
-	producer, err := sarama.NewAsyncProducerFromClient(client)
+	producer, err := sarama.NewSyncProducerFromClient(client)
 	if err != nil {
 		log.Panicf("failed to setup kafka producer: %s", err)
 	}
@@ -129,11 +72,6 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 }
 
 func (c *context) Stop() {
-
-	m, f := c.read()
-	log.Printf("size: %d", size.Of(m))
-	f()
-
 	c.doneCh <- struct{}{}
 }
 
@@ -202,13 +140,6 @@ func (c *context) Start() {
 			//			log.Printf("recieved message with offset %v", msg.Offset)
 			writes <- msg
 
-		case err := <-c.producer.Errors():
-			log.Panicf("failure to write to kafka: %s", err)
-
-		case msg := <-c.producer.Successes():
-			_ = msg
-			//log.Printf("write to kafka: %d", msg.Offset)
-
 		case <-c.doneCh:
 			log.Print("interrupt is detected")
 
@@ -263,24 +194,81 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	}
 }
 
-func (c *context) logProduct(logMsg *Product) {
+type asyncProducer struct {
+	producer sarama.AsyncProducer
+	wg       sync.WaitGroup
+}
 
-	//log.Printf("logProduct");
+func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+	producer, err := sarama.NewAsyncProducerFromClient(c.client)
+	if err != nil {
+		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
+	}
 
-	change := &TopicMessage{
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for err := range producer.Errors() {
+			f(err)
+		}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for range producer.Successes() {
+		}
+		wg.Done()
+	}()
+
+	return asyncProducer{
+		producer: producer,
+		wg:       wg,
+	}, nil
+}
+
+func (p *asyncProducer) Close() {
+	p.producer.AsyncClose()
+	p.wg.Wait()
+}
+
+func (c *context) logProduct(msg *Product) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
 		Messages: &TopicMessage_Product{
-			Product: logMsg,
+			Product: msg,
 		},
 	}
 
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(topicMsg)
 	if err != nil {
-		log.Panicf("failed to serialize cart change massage: %v", err)
+		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
 	}
 
-	msg := &sarama.ProducerMessage{
+	producerMsg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	c.producer.Input() <- msg
+	return c.producer.SendMessage(producerMsg)
+}
+
+func (p asyncProducer) logProduct(msg *Product) error {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_Product{
+			Product: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize product change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	p.producer.Input() <- producerMsg
+
+	return nil
 }

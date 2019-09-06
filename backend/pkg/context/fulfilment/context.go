@@ -250,24 +250,81 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	}
 }
 
-func (c *context) logStockCorrected(logMsg *StockCorrected) (int32, int64, error) {
+type asyncProducer struct {
+	producer sarama.AsyncProducer
+	wg       sync.WaitGroup
+}
 
-	//log.Printf("logStockCorrected");
+func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+	producer, err := sarama.NewAsyncProducerFromClient(c.client)
+	if err != nil {
+		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
+	}
 
-	change := &TopicMessage{
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for err := range producer.Errors() {
+			f(err)
+		}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for range producer.Successes() {
+		}
+		wg.Done()
+	}()
+
+	return asyncProducer{
+		producer: producer,
+		wg:       wg,
+	}, nil
+}
+
+func (p *asyncProducer) Close() {
+	p.producer.AsyncClose()
+	p.wg.Wait()
+}
+
+func (c *context) logStockCorrected(msg *StockCorrected) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
 		Messages: &TopicMessage_StockCorrected{
-			StockCorrected: logMsg,
+			StockCorrected: msg,
 		},
 	}
 
-	bytes, err := proto.Marshal(change)
+	bytes, err := proto.Marshal(topicMsg)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize cart change massage: %v", err)
+		return 0, 0, fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
 	}
 
-	msg := &sarama.ProducerMessage{
+	producerMsg := &sarama.ProducerMessage{
 		Topic: Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(msg)
+	return c.producer.SendMessage(producerMsg)
+}
+
+func (p asyncProducer) logStockCorrected(msg *StockCorrected) error {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_StockCorrected{
+			StockCorrected: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	p.producer.Input() <- producerMsg
+
+	return nil
 }

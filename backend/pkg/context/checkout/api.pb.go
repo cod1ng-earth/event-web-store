@@ -3,9 +3,11 @@
 
 package checkout
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -16,7 +18,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type Cart struct {
 	Id                   string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -30,16 +32,17 @@ func (m *Cart) Reset()         { *m = Cart{} }
 func (m *Cart) String() string { return proto.CompactTextString(m) }
 func (*Cart) ProtoMessage()    {}
 func (*Cart) Descriptor() ([]byte, []int) {
-	return fileDescriptor_api_885dac8e91d765b5, []int{0}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
+
 func (m *Cart) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Cart.Unmarshal(m, b)
 }
 func (m *Cart) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Cart.Marshal(b, m, deterministic)
 }
-func (dst *Cart) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Cart.Merge(dst, src)
+func (m *Cart) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Cart.Merge(m, src)
 }
 func (m *Cart) XXX_Size() int {
 	return xxx_messageInfo_Cart.Size(m)
@@ -81,16 +84,17 @@ func (m *Position) Reset()         { *m = Position{} }
 func (m *Position) String() string { return proto.CompactTextString(m) }
 func (*Position) ProtoMessage()    {}
 func (*Position) Descriptor() ([]byte, []int) {
-	return fileDescriptor_api_885dac8e91d765b5, []int{1}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
+
 func (m *Position) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Position.Unmarshal(m, b)
 }
 func (m *Position) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Position.Marshal(b, m, deterministic)
 }
-func (dst *Position) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Position.Merge(dst, src)
+func (m *Position) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Position.Merge(m, src)
 }
 func (m *Position) XXX_Size() int {
 	return xxx_messageInfo_Position.Size(m)
@@ -161,16 +165,17 @@ func (m *OrderCartResonse) Reset()         { *m = OrderCartResonse{} }
 func (m *OrderCartResonse) String() string { return proto.CompactTextString(m) }
 func (*OrderCartResonse) ProtoMessage()    {}
 func (*OrderCartResonse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_api_885dac8e91d765b5, []int{2}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
+
 func (m *OrderCartResonse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_OrderCartResonse.Unmarshal(m, b)
 }
 func (m *OrderCartResonse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_OrderCartResonse.Marshal(b, m, deterministic)
 }
-func (dst *OrderCartResonse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_OrderCartResonse.Merge(dst, src)
+func (m *OrderCartResonse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OrderCartResonse.Merge(m, src)
 }
 func (m *OrderCartResonse) XXX_Size() int {
 	return xxx_messageInfo_OrderCartResonse.Size(m)
@@ -200,16 +205,17 @@ func (m *ChangeProductQuantityRequest) Reset()         { *m = ChangeProductQuant
 func (m *ChangeProductQuantityRequest) String() string { return proto.CompactTextString(m) }
 func (*ChangeProductQuantityRequest) ProtoMessage()    {}
 func (*ChangeProductQuantityRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_api_885dac8e91d765b5, []int{3}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
+
 func (m *ChangeProductQuantityRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ChangeProductQuantityRequest.Unmarshal(m, b)
 }
 func (m *ChangeProductQuantityRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ChangeProductQuantityRequest.Marshal(b, m, deterministic)
 }
-func (dst *ChangeProductQuantityRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ChangeProductQuantityRequest.Merge(dst, src)
+func (m *ChangeProductQuantityRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ChangeProductQuantityRequest.Merge(m, src)
 }
 func (m *ChangeProductQuantityRequest) XXX_Size() int {
 	return xxx_messageInfo_ChangeProductQuantityRequest.Size(m)
@@ -241,9 +247,9 @@ func init() {
 	proto.RegisterType((*ChangeProductQuantityRequest)(nil), "checkout.ChangeProductQuantityRequest")
 }
 
-func init() { proto.RegisterFile("api.proto", fileDescriptor_api_885dac8e91d765b5) }
+func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
-var fileDescriptor_api_885dac8e91d765b5 = []byte{
+var fileDescriptor_00212fb1f9d3bf1c = []byte{
 	// 289 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x91, 0x4f, 0x4b, 0x03, 0x31,
 	0x10, 0xc5, 0xd9, 0x6d, 0x6d, 0x77, 0xa7, 0x28, 0x32, 0x78, 0x08, 0x52, 0x64, 0x59, 0x3c, 0xec,
