@@ -6,6 +6,7 @@ type contextDescription struct {
 	ReadLock     string
 	MessageNames []string
 	Bridges      []subscriber
+	Publisher    publisher
 }
 
 type subscriber struct {
@@ -15,5 +16,6 @@ type subscriber struct {
 }
 
 type publisher struct {
+	PkgPath      string
 	MessageNames []string
 }

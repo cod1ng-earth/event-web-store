@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"unicode/utf8"
 
 	"github.com/emicklei/proto"
 )
@@ -31,6 +32,19 @@ func UpdateCode(batch bool, readLock string, bridges []string) {
 	renderTemplate(f, desc)
 }
 
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func trimFirstRune(s string) string {
+	_, i := utf8.DecodeRuneInString(s)
+	return s[i:]
+}
+
 func createContextDescription(name string, batch bool, readLock string, bridges []string) contextDescription {
 
 	desc := contextDescription{
@@ -44,6 +58,22 @@ func createContextDescription(name string, batch bool, readLock string, bridges 
 		log.Fatalf("topic wrap message not defined in proto file")
 	}
 	desc.MessageNames = messageNames
+
+	publicProtoPath := filepath.Join("public", "topic.proto")
+	if fileExists(publicProtoPath) {
+		publicMessageNames, ok := findMessageNames(publicProtoPath)
+		if ok {
+			dir, err := os.Getwd()
+			if err != nil {
+				log.Fatalf("failed to get current dir: %v", err)
+			}
+			publicPkgPath := trimFirstRune(strings.TrimPrefix(dir, filepath.Join(os.Getenv("GOPATH"), "src")))
+			desc.Publisher = publisher{
+				MessageNames: publicMessageNames,
+				PkgPath:      publicPkgPath,
+			}
+		}
+	}
 
 	subscribers := []subscriber{}
 	for _, bridge := range bridges {

@@ -9,6 +9,8 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
+
+	public "github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/public"
 )
 
 const (
@@ -184,7 +186,16 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	switch x := cc.GetMessages().(type) {
 
 	case *TopicMessage_Product:
-		return updateModelProduct(model, msg.Offset, cc.GetProduct())
+		fact := cc.GetProduct()
+		err = updateModelProduct(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+
+		err = publishProduct(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -192,6 +203,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
+
+	return nil
 }
 
 type asyncProducer struct {
@@ -271,4 +284,24 @@ func (p asyncProducer) logProduct(msg *Product) error {
 	p.producer.Input() <- producerMsg
 
 	return nil
+}
+
+func (c *context) logPublicProduct(msg *public.Product) (int32, int64, error) {
+
+	topicMsg := &public.TopicMessage{
+		Messages: &public.TopicMessage_Product{
+			Product: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: public.Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
 }

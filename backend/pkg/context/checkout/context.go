@@ -13,6 +13,8 @@ import (
 	pim "github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/public"
 
 	fulfilment "github.com/cod1ng-earth/event-web-store/backend/pkg/context/fulfilment/public"
+
+	public "github.com/cod1ng-earth/event-web-store/backend/pkg/context/checkout/public"
 )
 
 const (
@@ -296,16 +298,52 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	switch x := cc.GetMessages().(type) {
 
 	case *TopicMessage_ChangeProductQuantity:
-		return updateModelChangeProductQuantity(model, msg.Offset, cc.GetChangeProductQuantity())
+		fact := cc.GetChangeProductQuantity()
+		err = updateModelChangeProductQuantity(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+
+		err = publishChangeProductQuantity(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case *TopicMessage_StockCorrected:
-		return updateModelStockCorrected(model, msg.Offset, cc.GetStockCorrected())
+		fact := cc.GetStockCorrected()
+		err = updateModelStockCorrected(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+
+		err = publishStockCorrected(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case *TopicMessage_Product:
-		return updateModelProduct(model, msg.Offset, cc.GetProduct())
+		fact := cc.GetProduct()
+		err = updateModelProduct(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+
+		err = publishProduct(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case *TopicMessage_OrderCart:
-		return updateModelOrderCart(model, msg.Offset, cc.GetOrderCart())
+		fact := cc.GetOrderCart()
+		err = updateModelOrderCart(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+
+		err = publishOrderCart(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -313,6 +351,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
+
+	return nil
 }
 
 type asyncProducer struct {
@@ -518,4 +558,24 @@ func (p asyncProducer) logOrderCart(msg *OrderCart) error {
 	p.producer.Input() <- producerMsg
 
 	return nil
+}
+
+func (c *context) logPublicOrderCreated(msg *public.OrderCreated) (int32, int64, error) {
+
+	topicMsg := &public.TopicMessage{
+		Messages: &public.TopicMessage_OrderCreated{
+			OrderCreated: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize orderCreated change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: public.Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
 }

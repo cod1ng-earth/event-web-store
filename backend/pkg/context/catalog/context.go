@@ -321,7 +321,11 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	switch x := cc.GetMessages().(type) {
 
 	case *TopicMessage_Product:
-		return batchUpdateModelProduct(model, msg.Offset, cc.GetProduct())
+		fact := cc.GetProduct()
+		err = batchUpdateModelProduct(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -329,6 +333,8 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
+
+	return nil
 }
 
 func updateModel(msg *sarama.ConsumerMessage, model *model) error {
@@ -341,7 +347,11 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	switch x := cc.GetMessages().(type) {
 
 	case *TopicMessage_Product:
-		return updateModelProduct(model, msg.Offset, cc.GetProduct())
+		fact := cc.GetProduct()
+		err = updateModelProduct(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
 
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
@@ -349,6 +359,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
+
+	return nil
 }
 
 type asyncProducer struct {

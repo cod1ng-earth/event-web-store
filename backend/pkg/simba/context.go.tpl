@@ -17,6 +17,10 @@ import (
 {{ range .Bridges }}
 	{{ .Name }} "{{ .PkgPath }}/public"
 {{ end }}
+
+{{ if .Publisher.PkgPath }}
+	public "{{ .Publisher.PkgPath }}/public"
+{{ end }}
 )
 
 const (
@@ -374,7 +378,17 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	{{ range .MessageNames }}
 	case *TopicMessage_{{ . | title }}:
-		return batchUpdateModel{{ . | title }}(model, msg.Offset, cc.Get{{ . | title }}())
+		fact := cc.Get{{ . | title }}()
+		err = batchUpdateModel{{ . | title }}(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ if $.Publisher.PkgPath }}
+		err = publish{{ . | title }}(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ end }}
 	{{ end }}
 
 	case nil:
@@ -383,6 +397,8 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
+
+	return nil
 }
 {{ end }}
 
@@ -397,7 +413,17 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 
 	{{ range .MessageNames }}
 	case *TopicMessage_{{ . | title }}:
-		return updateModel{{ . | title }}(model, msg.Offset, cc.Get{{ . | title }}())
+		fact := cc.Get{{ . | title }}()
+		err = updateModel{{ . | title }}(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ if $.Publisher.PkgPath }}
+		err = publish{{ . | title }}(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ end }}
 	{{ end }}
 
 	case nil:
@@ -406,6 +432,8 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	default:
 		panic(fmt.Sprintf("unexpected type %T in oneof", x))
 	}
+
+	return nil
 }
 
 type asyncProducer struct {
@@ -486,5 +514,27 @@ func (p asyncProducer) log{{ . | title }}(msg *{{ . | title }}) error {
 	p.producer.Input() <- producerMsg
 
 	return nil
+}
+{{ end }}
+
+{{ range .Publisher.MessageNames }}
+func (c *context) logPublic{{ . | title }}(msg *public.{{ . | title }}) (int32, int64, error) {
+
+	topicMsg := &public.TopicMessage{
+		Messages: &public.TopicMessage_{{ . | title }}{
+			{{ . | title }}: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: public.Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
 }
 {{ end }}
