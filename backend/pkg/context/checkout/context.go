@@ -129,7 +129,7 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 		c.offsetChanged.Broadcast()
 	}()
 
-	updateModel(msg, m)
+	updateModel(c, msg, m)
 
 }
 
@@ -288,7 +288,7 @@ func (c *context) read() (*model, func()) {
 
 }
 
-func updateModel(msg *sarama.ConsumerMessage, model *model) error {
+func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
@@ -304,7 +304,7 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 
-		err = publishChangeProductQuantity(model, msg.Offset, fact)
+		err = publishChangeProductQuantity(c, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
@@ -316,7 +316,7 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 
-		err = publishStockCorrected(model, msg.Offset, fact)
+		err = publishStockCorrected(c, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
@@ -328,7 +328,7 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 
-		err = publishProduct(model, msg.Offset, fact)
+		err = publishProduct(c, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
@@ -340,7 +340,7 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 
-		err = publishOrderCart(model, msg.Offset, fact)
+		err = publishOrderCart(c, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}

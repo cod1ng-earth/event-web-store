@@ -180,12 +180,12 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 	//	log.Printf("applying message with offset %v", msg.Offset)
 
 	if msg.Offset < c.batchOffset {
-		batchUpdateModel(msg, m)
+		batchUpdateModel(c, msg, m)
 	} else if msg.Offset == c.batchOffset {
-		batchUpdateModel(msg, m)
+		batchUpdateModel(c, msg, m)
 		batchFinalizeModel(m)
 	} else {
-		updateModel(msg, m)
+		updateModel(c, msg, m)
 	}
 
 }
@@ -311,7 +311,7 @@ func (c *context) read() (*model, func()) {
 
 }
 
-func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
+func batchUpdateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
@@ -337,7 +337,7 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 	return nil
 }
 
-func updateModel(msg *sarama.ConsumerMessage, model *model) error {
+func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {

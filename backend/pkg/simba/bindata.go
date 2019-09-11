@@ -265,15 +265,15 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 
 {{ if .Batch }}
 	if msg.Offset < c.batchOffset {
-		batchUpdateModel(msg, m)
+		batchUpdateModel(c, msg, m)
 	} else if msg.Offset == c.batchOffset {
-		batchUpdateModel(msg, m)
+		batchUpdateModel(c, msg, m)
 		batchFinalizeModel(m)
 	} else {
-		updateModel(msg, m)
+		updateModel(c, msg, m)
 	}
 {{ else }}
-	updateModel(msg, m)
+	updateModel(c, msg, m)
 {{ end }}
 }
 
@@ -413,7 +413,7 @@ func (c *context) read() (*model, func()) {
 }
 
 {{ if .Batch }}
-func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
+func batchUpdateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
@@ -430,7 +430,7 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 		{{ if $.Publisher.PkgPath }}
-		err = publish{{ . | title }}(model, msg.Offset, fact)
+		err = publish{{ . | title }}(c, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
@@ -448,7 +448,7 @@ func batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
 }
 {{ end }}
 
-func updateModel(msg *sarama.ConsumerMessage, model *model) error {
+func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
@@ -465,7 +465,7 @@ func updateModel(msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 		{{ if $.Publisher.PkgPath }}
-		err = publish{{ . | title }}(model, msg.Offset, fact)
+		err = publish{{ . | title }}(c, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
