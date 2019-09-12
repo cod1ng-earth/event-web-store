@@ -365,7 +365,7 @@ func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 
 type asyncProducer struct {
 	producer sarama.AsyncProducer
-	wg       sync.WaitGroup
+	wg       *sync.WaitGroup
 }
 
 func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
@@ -391,7 +391,7 @@ func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
 
 	return asyncProducer{
 		producer: producer,
-		wg:       wg,
+		wg:       &wg,
 	}, nil
 }
 
