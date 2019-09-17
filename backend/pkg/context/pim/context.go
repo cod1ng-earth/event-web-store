@@ -212,7 +212,7 @@ type asyncProducer struct {
 	wg       *sync.WaitGroup
 }
 
-func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+func (c *context) newAsyncProducer(f func(error)) (asyncProducer, error) {
 	producer, err := sarama.NewAsyncProducerFromClient(c.client)
 	if err != nil {
 		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
@@ -244,26 +244,6 @@ func (p *asyncProducer) Close() {
 	p.wg.Wait()
 }
 
-func (c *context) logProduct(msg *Product) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_Product{
-			Product: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
-}
-
 func (p asyncProducer) logProduct(msg *Product) error {
 
 	topicMsg := &TopicMessage{
@@ -286,7 +266,35 @@ func (p asyncProducer) logProduct(msg *Product) error {
 	return nil
 }
 
-func (c *context) logPublicProduct(msg *public.Product) (int32, int64, error) {
+type internalTopic struct {
+	producer sarama.SyncProducer
+}
+
+func (c *internalTopic) logProduct(msg *Product) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_Product{
+			Product: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+type publisher struct {
+	producer sarama.SyncProducer
+}
+
+func (p *publisher) logProduct(msg *public.Product) (int32, int64, error) {
 
 	topicMsg := &public.TopicMessage{
 		Messages: &public.TopicMessage_Product{
@@ -303,5 +311,5 @@ func (c *context) logPublicProduct(msg *public.Product) (int32, int64, error) {
 		Topic: public.Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(producerMsg)
+	return p.producer.SendMessage(producerMsg)
 }

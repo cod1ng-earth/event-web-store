@@ -360,7 +360,7 @@ type asyncProducer struct {
 	wg       *sync.WaitGroup
 }
 
-func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+func (c *context) newAsyncProducer(f func(error)) (asyncProducer, error) {
 	producer, err := sarama.NewAsyncProducerFromClient(c.client)
 	if err != nil {
 		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
@@ -392,26 +392,6 @@ func (p *asyncProducer) Close() {
 	p.wg.Wait()
 }
 
-func (c *context) logChangeProductQuantity(msg *ChangeProductQuantity) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_ChangeProductQuantity{
-			ChangeProductQuantity: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize changeProductQuantity change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
-}
-
 func (p asyncProducer) logChangeProductQuantity(msg *ChangeProductQuantity) error {
 
 	topicMsg := &TopicMessage{
@@ -432,26 +412,6 @@ func (p asyncProducer) logChangeProductQuantity(msg *ChangeProductQuantity) erro
 	p.producer.Input() <- producerMsg
 
 	return nil
-}
-
-func (c *context) logStockCorrected(msg *StockCorrected) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_StockCorrected{
-			StockCorrected: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
 }
 
 func (p asyncProducer) logStockCorrected(msg *StockCorrected) error {
@@ -476,26 +436,6 @@ func (p asyncProducer) logStockCorrected(msg *StockCorrected) error {
 	return nil
 }
 
-func (c *context) logProduct(msg *Product) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_Product{
-			Product: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
-}
-
 func (p asyncProducer) logProduct(msg *Product) error {
 
 	topicMsg := &TopicMessage{
@@ -516,26 +456,6 @@ func (p asyncProducer) logProduct(msg *Product) error {
 	p.producer.Input() <- producerMsg
 
 	return nil
-}
-
-func (c *context) logOrderCart(msg *OrderCart) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_OrderCart{
-			OrderCart: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize orderCart change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
 }
 
 func (p asyncProducer) logOrderCart(msg *OrderCart) error {
@@ -560,7 +480,95 @@ func (p asyncProducer) logOrderCart(msg *OrderCart) error {
 	return nil
 }
 
-func (c *context) logPublicOrderCreated(msg *public.OrderCreated) (int32, int64, error) {
+type internalTopic struct {
+	producer sarama.SyncProducer
+}
+
+func (c *internalTopic) logChangeProductQuantity(msg *ChangeProductQuantity) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_ChangeProductQuantity{
+			ChangeProductQuantity: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize changeProductQuantity change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+func (c *internalTopic) logStockCorrected(msg *StockCorrected) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_StockCorrected{
+			StockCorrected: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+func (c *internalTopic) logProduct(msg *Product) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_Product{
+			Product: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize product change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+func (c *internalTopic) logOrderCart(msg *OrderCart) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_OrderCart{
+			OrderCart: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize orderCart change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+type publisher struct {
+	producer sarama.SyncProducer
+}
+
+func (p *publisher) logOrderCreated(msg *public.OrderCreated) (int32, int64, error) {
 
 	topicMsg := &public.TopicMessage{
 		Messages: &public.TopicMessage_OrderCreated{
@@ -577,5 +585,5 @@ func (c *context) logPublicOrderCreated(msg *public.OrderCreated) (int32, int64,
 		Topic: public.Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(producerMsg)
+	return p.producer.SendMessage(producerMsg)
 }

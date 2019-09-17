@@ -268,7 +268,7 @@ type asyncProducer struct {
 	wg       *sync.WaitGroup
 }
 
-func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+func (c *context) newAsyncProducer(f func(error)) (asyncProducer, error) {
 	producer, err := sarama.NewAsyncProducerFromClient(c.client)
 	if err != nil {
 		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
@@ -300,26 +300,6 @@ func (p *asyncProducer) Close() {
 	p.wg.Wait()
 }
 
-func (c *context) logStockCorrected(msg *StockCorrected) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_StockCorrected{
-			StockCorrected: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
-}
-
 func (p asyncProducer) logStockCorrected(msg *StockCorrected) error {
 
 	topicMsg := &TopicMessage{
@@ -342,7 +322,35 @@ func (p asyncProducer) logStockCorrected(msg *StockCorrected) error {
 	return nil
 }
 
-func (c *context) logPublicStockCorrected(msg *public.StockCorrected) (int32, int64, error) {
+type internalTopic struct {
+	producer sarama.SyncProducer
+}
+
+func (c *internalTopic) logStockCorrected(msg *StockCorrected) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_StockCorrected{
+			StockCorrected: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize stockCorrected change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+
+type publisher struct {
+	producer sarama.SyncProducer
+}
+
+func (p *publisher) logStockCorrected(msg *public.StockCorrected) (int32, int64, error) {
 
 	topicMsg := &public.TopicMessage{
 		Messages: &public.TopicMessage_StockCorrected{
@@ -359,5 +367,5 @@ func (c *context) logPublicStockCorrected(msg *public.StockCorrected) (int32, in
 		Topic: public.Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(producerMsg)
+	return p.producer.SendMessage(producerMsg)
 }

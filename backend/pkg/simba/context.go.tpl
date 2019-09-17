@@ -139,7 +139,12 @@ func (c *context) AwaitLastOffset() {
 	c.await(c.batchOffset)
 }
 
-func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
+type aggregator struct {
+	consumer    sarama.Consumer
+	aggregation model
+}
+
+func (c *aggregator) updateLoop(writes <-chan *sarama.ConsumerMessage) {
 
 	{{ if eq .ReadLock "wait-free" }}
 	writesRedo := make(chan *sarama.ConsumerMessage, 32768)
@@ -230,6 +235,76 @@ func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
 	updateModel(c, msg, m)
 {{ end }}
 }
+
+func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
+	cc := TopicMessage{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+	}
+
+	switch x := cc.GetMessages().(type) {
+
+	{{ range .MessageNames }}
+	case *TopicMessage_{{ . | title }}:
+		fact := cc.Get{{ . | title }}()
+		err = updateModel{{ . | title }}(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ if $.Publisher.PkgPath }}
+		err = publish{{ . | title }}(c, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ end }}
+	{{ end }}
+
+	case nil:
+		panic(fmt.Sprintf("context message is empty"))
+
+	default:
+		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	}
+
+	return nil
+}
+
+{{ if .Batch }}
+func batchUpdateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
+	cc := TopicMessage{}
+	err := proto.Unmarshal(msg.Value, &cc)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+	}
+
+	switch x := cc.GetMessages().(type) {
+
+	{{ range .MessageNames }}
+	case *TopicMessage_{{ . | title }}:
+		fact := cc.Get{{ . | title }}()
+		err = batchUpdateModel{{ . | title }}(model, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ if $.Publisher.PkgPath }}
+		err = publish{{ . | title }}(c, msg.Offset, fact)
+		if err != nil {
+			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+		{{ end }}
+	{{ end }}
+
+	case nil:
+		panic(fmt.Sprintf("context message is empty"))
+
+	default:
+		panic(fmt.Sprintf("unexpected type %T in oneof", x))
+	}
+
+	return nil
+}
+{{ end }}
 
 {{ range .Bridges }}
 func (c *context) bridge{{ .Name | title }}() {
@@ -366,82 +441,12 @@ func (c *context) read() (*model, func()) {
 {{ end }}
 }
 
-{{ if .Batch }}
-func batchUpdateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
-	cc := TopicMessage{}
-	err := proto.Unmarshal(msg.Value, &cc)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
-	}
-
-	switch x := cc.GetMessages().(type) {
-
-	{{ range .MessageNames }}
-	case *TopicMessage_{{ . | title }}:
-		fact := cc.Get{{ . | title }}()
-		err = batchUpdateModel{{ . | title }}(model, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-		{{ if $.Publisher.PkgPath }}
-		err = publish{{ . | title }}(c, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-		{{ end }}
-	{{ end }}
-
-	case nil:
-		panic(fmt.Sprintf("context message is empty"))
-
-	default:
-		panic(fmt.Sprintf("unexpected type %T in oneof", x))
-	}
-
-	return nil
-}
-{{ end }}
-
-func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
-	cc := TopicMessage{}
-	err := proto.Unmarshal(msg.Value, &cc)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
-	}
-
-	switch x := cc.GetMessages().(type) {
-
-	{{ range .MessageNames }}
-	case *TopicMessage_{{ . | title }}:
-		fact := cc.Get{{ . | title }}()
-		err = updateModel{{ . | title }}(model, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-		{{ if $.Publisher.PkgPath }}
-		err = publish{{ . | title }}(c, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-		{{ end }}
-	{{ end }}
-
-	case nil:
-		panic(fmt.Sprintf("context message is empty"))
-
-	default:
-		panic(fmt.Sprintf("unexpected type %T in oneof", x))
-	}
-
-	return nil
-}
-
 type asyncProducer struct {
 	producer sarama.AsyncProducer
 	wg       *sync.WaitGroup
 }
 
-func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+func (c *context) newAsyncProducer(f func(error)) (asyncProducer, error) {
 	producer, err := sarama.NewAsyncProducerFromClient(c.client)
 	if err != nil {
 		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
@@ -474,26 +479,6 @@ func (p *asyncProducer) Close() {
 }
 
 {{ range .MessageNames }}
-func (c *context) log{{ . | title }}(msg *{{ . | title }}) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_{{ . | title }}{
-			{{ . | title }}: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
-}
-
 func (p asyncProducer) log{{ . | title }}(msg *{{ . | title }}) error {
 
 	topicMsg := &TopicMessage{
@@ -517,8 +502,41 @@ func (p asyncProducer) log{{ . | title }}(msg *{{ . | title }}) error {
 }
 {{ end }}
 
+type internalTopic struct {
+	producer  sarama.SyncProducer
+}
+
+{{ range .MessageNames }}
+func (c *internalTopic) log{{ . | title }}(msg *{{ . | title }}) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_{{ . | title }}{
+			{{ . | title }}: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+{{ end }}
+
+
+{{ if .Publisher.PkgPath }}
+type publisher struct {
+	producer  sarama.SyncProducer
+}
+{{ end }}
+
 {{ range .Publisher.MessageNames }}
-func (c *context) logPublic{{ . | title }}(msg *public.{{ . | title }}) (int32, int64, error) {
+func (p *publisher) log{{ . | title }}(msg *public.{{ . | title }}) (int32, int64, error) {
 
 	topicMsg := &public.TopicMessage{
 		Messages: &public.TopicMessage_{{ . | title }}{
@@ -535,6 +553,6 @@ func (c *context) logPublic{{ . | title }}(msg *public.{{ . | title }}) (int32, 
 		Topic: public.Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(producerMsg)
+	return p.producer.SendMessage(producerMsg)
 }
 {{ end }}

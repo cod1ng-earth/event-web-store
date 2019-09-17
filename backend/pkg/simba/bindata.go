@@ -487,7 +487,7 @@ type asyncProducer struct {
 	wg       *sync.WaitGroup
 }
 
-func (c *context) newSyncProducer(f func(error)) (asyncProducer, error) {
+func (c *context) newAsyncProducer(f func(error)) (asyncProducer, error) {
 	producer, err := sarama.NewAsyncProducerFromClient(c.client)
 	if err != nil {
 		return asyncProducer{}, fmt.Errorf("failed to create async producer: %v", err)
@@ -520,26 +520,6 @@ func (p *asyncProducer) Close() {
 }
 
 {{ range .MessageNames }}
-func (c *context) log{{ . | title }}(msg *{{ . | title }}) (int32, int64, error) {
-
-	topicMsg := &TopicMessage{
-		Messages: &TopicMessage_{{ . | title }}{
-			{{ . | title }}: msg,
-		},
-	}
-
-	bytes, err := proto.Marshal(topicMsg)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
-	}
-
-	producerMsg := &sarama.ProducerMessage{
-		Topic: Topic,
-		Value: sarama.ByteEncoder(bytes),
-	}
-	return c.producer.SendMessage(producerMsg)
-}
-
 func (p asyncProducer) log{{ . | title }}(msg *{{ . | title }}) error {
 
 	topicMsg := &TopicMessage{
@@ -563,8 +543,41 @@ func (p asyncProducer) log{{ . | title }}(msg *{{ . | title }}) error {
 }
 {{ end }}
 
+type internalTopic struct {
+	producer  sarama.SyncProducer
+}
+
+{{ range .MessageNames }}
+func (c *internalTopic) log{{ . | title }}(msg *{{ . | title }}) (int32, int64, error) {
+
+	topicMsg := &TopicMessage{
+		Messages: &TopicMessage_{{ . | title }}{
+			{{ . | title }}: msg,
+		},
+	}
+
+	bytes, err := proto.Marshal(topicMsg)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to serialize {{ . }} change massage: %v", err)
+	}
+
+	producerMsg := &sarama.ProducerMessage{
+		Topic: Topic,
+		Value: sarama.ByteEncoder(bytes),
+	}
+	return c.producer.SendMessage(producerMsg)
+}
+{{ end }}
+
+
+{{ if .Publisher.PkgPath }}
+type publisher struct {
+	producer  sarama.SyncProducer
+}
+{{ end }}
+
 {{ range .Publisher.MessageNames }}
-func (c *context) logPublic{{ . | title }}(msg *public.{{ . | title }}) (int32, int64, error) {
+func (p *publisher) log{{ . | title }}(msg *public.{{ . | title }}) (int32, int64, error) {
 
 	topicMsg := &public.TopicMessage{
 		Messages: &public.TopicMessage_{{ . | title }}{
@@ -581,7 +594,7 @@ func (c *context) logPublic{{ . | title }}(msg *public.{{ . | title }}) (int32, 
 		Topic: public.Topic,
 		Value: sarama.ByteEncoder(bytes),
 	}
-	return c.producer.SendMessage(producerMsg)
+	return p.producer.SendMessage(producerMsg)
 }
 {{ end }}
 `)
