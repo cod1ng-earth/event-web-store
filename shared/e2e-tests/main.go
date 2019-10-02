@@ -34,13 +34,16 @@ func main() {
 
 	start := time.Now()
 	width, height := 1024, 768
-	chromedp.Run(ctx, emulation.SetDeviceMetricsOverride(int64(width), int64(height), 1.0, false))
+	err := chromedp.Run(ctx, emulation.SetDeviceMetricsOverride(int64(width), int64(height), 1.0, false))
+	if err != nil {
+		log.Fatalf("staring chrome failed: %v", err)
+	}
 	log.Printf("staring and resizing chrome took %v", time.Since(start))
 
 	start = time.Now()
 	picture := &[]byte{}
 	var h2 string
-	chromedp.Run(
+	err = chromedp.Run(
 		ctx,
 		//5*time.Second,
 		chromedp.Navigate(`http://localhost:8000/`),
@@ -51,13 +54,16 @@ func main() {
 		chromedp.Text(`#main > h2`, &h2),
 		chromedp.CaptureScreenshot(picture),
 		screenshotSave("cart_ordered.png", picture))
+	if err != nil {
+		log.Fatalf("running tests failed: %v", err)
+	}
 	log.Printf("test took %v", time.Since(start))
 	log.Printf("h2: %v", h2)
 
 	start = time.Now()
 	picture = &[]byte{}
 	var price string
-	chromedp.Run(
+	err = chromedp.Run(
 		ctx,
 		//5*time.Second,
 		chromedp.Navigate(`http://localhost:8000/`),
@@ -66,6 +72,9 @@ func main() {
 		chromedp.Text(`#main > div > div.mdl-cell.mdl-cell--4-col > span.mdl-typography--display-1.custom-detail-block`, &price),
 		chromedp.CaptureScreenshot(picture),
 		screenshotSave("detail_page.png", picture))
+	if err != nil {
+		log.Fatalf("running tests failed: %v", err)
+	}
 	log.Printf("test took %v", time.Since(start))
 	log.Printf("price: %v", price)
 }

@@ -58,7 +58,10 @@ func (c *context) ImportFile(path string, verbose bool) {
 		}
 
 		// if new or changed -> upsert
-		producer.logProduct(newProduct)
+		err := producer.logProduct(newProduct)
+		if err != nil {
+			log.Fatalf("sending product message failed: %v", err)
+		}
 	}
 	if verbose {
 		log.Printf("updated and inserted products")
@@ -66,7 +69,10 @@ func (c *context) ImportFile(path string, verbose bool) {
 
 	for _, oldProduct := range oldProducts {
 		oldProduct.Disabled = true
-		producer.logProduct(oldProduct)
+		err := producer.logProduct(oldProduct)
+		if err != nil {
+			log.Fatalf("sending product message failed: %v", err)
+		}
 	}
 	if verbose {
 		log.Printf("disabled old products")
