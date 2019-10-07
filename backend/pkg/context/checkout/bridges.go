@@ -17,7 +17,7 @@ func (m *model) getFulfilmentOffset() int64 {
 
 func translatePimProduct(c *context, m *model, offset int64, msg *pim.Product) error {
 	log.Printf("translate PimProduct %v to checkout", offset)
-	_, _, err := c.logProduct(&Product{
+	_, _, err := c.internalTopic.logProduct(&Product{
 		ProductID:     msg.Id,
 		Price:         msg.Price,
 		Name:          msg.Name,
@@ -29,7 +29,7 @@ func translatePimProduct(c *context, m *model, offset int64, msg *pim.Product) e
 
 func translateFulfilmentStockCorrected(c *context, m *model, offset int64, msg *fulfilment.StockCorrected) error {
 	log.Printf("translate stock corrected %v to checkkout", offset)
-	_, _, err := c.logStockCorrected(&StockCorrected{
+	_, _, err := c.internalTopic.logStockCorrected(&StockCorrected{
 		ProductID:        msg.ProductID,
 		QuantityChange:   msg.QuantityChange,
 		FulfilmentOffset: offset,

@@ -15,7 +15,7 @@ type stock struct {
 
 func (c *context) ImportFile(path string, verbose bool) {
 
-	model, free := c.read()
+	model, free := c.aggregator.read()
 	defer free()
 
 	inventory := model.inventory
@@ -45,7 +45,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 			continue
 		}
 
-		_, _, err = c.logStockCorrected(correction)
+		_, _, err = c.internalTopic.logStockCorrected(correction)
 		if err != nil {
 			log.Fatalf("failed to store stock correction %v: %v", stock, err)
 		}

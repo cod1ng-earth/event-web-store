@@ -30,7 +30,7 @@ func (c *context) NewCatalogHandler() http.HandlerFunc {
 		}
 		page := int64(pageInt)
 
-		model, close := c.read()
+		model, close := c.aggregator.read()
 		defer close()
 		pp, err := loadProducts(sort, prefix, model)
 		if err != nil {

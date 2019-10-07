@@ -50,7 +50,7 @@ func (c *context) NewCartHandler() http.HandlerFunc {
 			}
 		}
 
-		m, free := c.read()
+		m, free := c.aggregator.read()
 		defer free()
 
 		pp := positions{}
@@ -105,13 +105,13 @@ func addToCart(c *context, w http.ResponseWriter, r *http.Request, cartID string
 		ProductID: ccr.ProductID,
 		Quantity:  ccr.Quantity,
 	}
-	_, msgOffset, err := c.logChangeProductQuantity(cc)
+	_, msgOffset, err := c.internalTopic.logChangeProductQuantity(cc)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return fmt.Errorf("failed to send cart change to kafka: %v", err)
 	}
 
-	c.await(msgOffset)
+	c.aggregator.await(msgOffset)
 
 	return nil
 }

@@ -23,15 +23,13 @@ type context struct {
 
 	client   sarama.Client
 	consumer sarama.Consumer
-	producer sarama.SyncProducer
 
-	batchOffset int64
+	publisherConsumer sarama.Consumer
+	publisher         publisher
 
-	model *model
-	lock  *sync.RWMutex
+	internalTopic internalTopic
 
-	offset        int64
-	offsetChanged *sync.Cond
+	aggregator aggregator
 }
 
 func NewContext(brokers *[]string, cfg *sarama.Config) context {
@@ -44,6 +42,12 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 	if err != nil {
 		log.Panicf("failed to setup kafka consumer: %s", err)
 	}
+
+	publisherConsumer, err := sarama.NewConsumerFromClient(client)
+	if err != nil {
+		log.Panicf("failed to setup kafka consumer for publisher: %s", err)
+	}
+
 	producer, err := sarama.NewSyncProducerFromClient(client)
 	if err != nil {
 		log.Panicf("failed to setup kafka producer: %s", err)
@@ -60,15 +64,22 @@ func NewContext(brokers *[]string, cfg *sarama.Config) context {
 
 		client:   client,
 		consumer: consumer,
-		producer: producer,
 
-		batchOffset: batchOffset,
+		publisherConsumer: publisherConsumer,
 
-		model: newModel(),
-		lock:  &sync.RWMutex{},
+		internalTopic: internalTopic{
+			producer: producer,
+		},
 
-		offset:        0,
-		offsetChanged: sync.NewCond(&sync.Mutex{}),
+		aggregator: aggregator{
+
+			model: newModel(),
+			lock:  &sync.RWMutex{},
+
+			batchOffset:   batchOffset,
+			offset:        0,
+			offsetChanged: sync.NewCond(&sync.Mutex{}),
+		},
 	}
 	return context
 }
@@ -77,61 +88,23 @@ func (c *context) Stop() {
 	c.doneCh <- struct{}{}
 }
 
-func (c *context) await(offset int64) {
-	if offset == -1 {
-		return
-	}
-	if c.offset >= offset {
-		return
-	}
-	c.offsetChanged.L.Lock()
-	for c.offset < offset {
-		c.offsetChanged.Wait()
-	}
-	c.offsetChanged.L.Unlock()
-}
-
-func (c *context) AwaitLastOffset() {
-	c.await(c.batchOffset)
-}
-
-func (c *context) updateLoop(writes <-chan *sarama.ConsumerMessage) {
-
-	for {
-
-		for msg := range writes {
-			applyChange(msg, c.model, c)
-		}
-
-	}
-}
-
-func applyChange(msg *sarama.ConsumerMessage, m *model, c *context) {
-
-	//	log.Printf("applying message with offset %v", msg.Offset)
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	defer func() {
-		c.offset = msg.Offset
-		c.offsetChanged.Broadcast()
-	}()
-
-	updateModel(c, msg, m)
-
-}
-
 func (c *context) Start() {
 
 	log.Printf("starting context %v", Topic)
 
 	writes := make(chan *sarama.ConsumerMessage, 32768)
-	go c.updateLoop(writes)
+	go c.aggregator.updateLoop(writes)
 
 	partition, err := c.consumer.ConsumePartition(Topic, 0, 0)
 	if err != nil {
 		log.Panicf("failed to setup kafka partition: %s", err)
 	}
+
+	publisherPartition, err := c.publisherConsumer.ConsumePartition(Topic, 0, 0)
+	if err != nil {
+		log.Panicf("failed to setup kafka partition for publisher: %s", err)
+	}
+	go c.publisher.updateLoop(publisherPartition.Messages())
 
 	for {
 		select {
@@ -152,7 +125,15 @@ func (c *context) Start() {
 			if err := c.consumer.Close(); err != nil {
 				log.Panicf("failed to close kafka consumer: %s", err)
 			}
-			if err := c.producer.Close(); err != nil {
+
+			if err := publisherPartition.Close(); err != nil {
+				log.Panicf("failed to close kafka partition for publisher: %s", err)
+			}
+			if err := c.publisherConsumer.Close(); err != nil {
+				log.Panicf("failed to close kafka consumer for publisher: %s", err)
+			}
+
+			if err := c.internalTopic.producer.Close(); err != nil {
 				log.Panicf("failed to close kafka producer: %s", err)
 			}
 			if err := c.client.Close(); err != nil {
@@ -163,20 +144,63 @@ func (c *context) Start() {
 	}
 }
 
-func (c *context) read() (*model, func()) {
+type aggregator struct {
+	consumer    sarama.Consumer
+	aggregation model
 
+	model *model
+	lock  *sync.RWMutex
+
+	batchOffset   int64
+	offset        int64
+	offsetChanged *sync.Cond
+}
+
+func (c *aggregator) await(offset int64) {
+	if offset == -1 {
+		return
+	}
+	if c.offset >= offset {
+		return
+	}
 	c.offsetChanged.L.Lock()
-	for c.offset < c.batchOffset {
+	for c.offset < offset {
 		c.offsetChanged.Wait()
 	}
 	c.offsetChanged.L.Unlock()
+}
 
-	c.lock.RLock()
-	return c.model, c.lock.RUnlock
+func (c *aggregator) AwaitLastOffset() {
+	c.await(c.batchOffset)
+}
+
+func (c *aggregator) updateLoop(writes <-chan *sarama.ConsumerMessage) {
+
+	for {
+
+		for msg := range writes {
+			c.applyChange(msg, c.model)
+		}
+
+	}
+}
+
+func (c *aggregator) applyChange(msg *sarama.ConsumerMessage, m *model) {
+
+	//	log.Printf("applying message with offset %v", msg.Offset)
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	defer func() {
+		c.offset = msg.Offset
+		c.offsetChanged.Broadcast()
+	}()
+
+	c.updateModel(msg, m)
 
 }
 
-func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
+func (c aggregator) updateModel(msg *sarama.ConsumerMessage, model *model) error {
 	cc := TopicMessage{}
 	err := proto.Unmarshal(msg.Value, &cc)
 	if err != nil {
@@ -192,11 +216,6 @@ func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}
 
-		err = publishProduct(c, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-
 	case nil:
 		panic(fmt.Sprintf("context message is empty"))
 
@@ -205,6 +224,19 @@ func updateModel(c *context, msg *sarama.ConsumerMessage, model *model) error {
 	}
 
 	return nil
+}
+
+func (c aggregator) read() (*model, func()) {
+
+	c.offsetChanged.L.Lock()
+	for c.offset < c.batchOffset {
+		c.offsetChanged.Wait()
+	}
+	c.offsetChanged.L.Unlock()
+
+	c.lock.RLock()
+	return c.model, c.lock.RUnlock
+
 }
 
 type asyncProducer struct {
@@ -294,7 +326,33 @@ type publisher struct {
 	producer sarama.SyncProducer
 }
 
-func (p *publisher) logProduct(msg *public.Product) (int32, int64, error) {
+func (c *publisher) updateLoop(writes <-chan *sarama.ConsumerMessage) {
+	for msg := range writes {
+
+		cc := TopicMessage{}
+		err := proto.Unmarshal(msg.Value, &cc)
+		if err != nil {
+			log.Fatalf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
+		}
+
+		switch x := cc.GetMessages().(type) {
+
+		case *TopicMessage_Product:
+			err = c.publishProduct(msg.Offset, cc.GetProduct())
+			if err != nil {
+				panic(fmt.Errorf("failed to publish kafka massage %s/%d: %v", Topic, msg.Offset, err))
+			}
+
+		case nil:
+			panic(fmt.Sprintf("context message is empty"))
+
+		default:
+			panic(fmt.Sprintf("unexpected type %T in oneof", x))
+		}
+	}
+}
+
+func (p *publisher) logProduct(internalOffset int64, msg *public.Product) (int32, int64, error) {
 
 	topicMsg := &public.TopicMessage{
 		Messages: &public.TopicMessage_Product{

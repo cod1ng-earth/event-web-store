@@ -12,7 +12,7 @@ func (m *model) getPimOffset() int64 {
 
 func translatePimProduct(c *context, m *model, offset int64, msg *pim.Product) error {
 	log.Printf("translatePimProduct %v", offset)
-	_, _, err := c.logProduct(&Product{
+	_, _, err := c.internalTopic.logProduct(&Product{
 		Id:            msg.Id,
 		Price:         msg.Price,
 		Name:          msg.Name,

@@ -4,8 +4,8 @@ import (
 	public "github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim/public"
 )
 
-func publishProduct(c *context, offset int64, fact *Product) error {
-	p := &public.Product{
+func (p publisher) publishProduct(offset int64, fact *Product) error {
+	i := &public.Product{
 		Id:            fact.Id,
 		Price:         fact.Price,
 		Name:          fact.Name,
@@ -17,6 +17,6 @@ func publishProduct(c *context, offset int64, fact *Product) error {
 		Disabled:      fact.Disabled,
 		Tax:           fact.Tax,
 	}
-	_, _, err := c.logPublicProduct(p)
+	_, _, err := p.logProduct(offset, i)
 	return err
 }

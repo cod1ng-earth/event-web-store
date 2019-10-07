@@ -21,7 +21,7 @@ func (c *context) NewPDPHandler() http.HandlerFunc {
 			return
 		}
 
-		m, close := c.read()
+		m, close := c.aggregator.read()
 		defer close()
 
 		p, ok := m.products[uuid]
