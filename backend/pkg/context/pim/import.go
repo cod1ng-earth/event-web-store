@@ -11,7 +11,8 @@ import (
 
 func (c *context) ImportFile(path string, verbose bool) {
 
-	log.Printf("importing %s", path)
+	log.Printf("loading current state %s", path)
+	c.aggregator.AwaitLastOffset()
 	model, free := c.aggregator.read()
 
 	log.Print("accessing model")
@@ -24,9 +25,6 @@ func (c *context) ImportFile(path string, verbose bool) {
 		oldProducts[product.Id] = product
 	}
 	free()
-	if verbose {
-		log.Printf("loaded current products")
-	}
 
 	producer, err := c.newAsyncProducer(func(err error) {
 		log.Fatalf("failure to write to kafka: %s", err)
@@ -35,6 +33,7 @@ func (c *context) ImportFile(path string, verbose bool) {
 		log.Fatalf("failed send messages to kafka: %s", err)
 	}
 
+	log.Printf("importing file: %s", path)
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("failed to open import file: %s", err)

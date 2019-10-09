@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim"
@@ -29,13 +30,16 @@ func main() {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.Consumer.IsolationLevel = sarama.ReadCommitted
 
-	config.Producer.Flush.Messages = 5
+	// config.Producer.Flush.Messages = 5
 	//	config.Producer.Flush.MaxMessages = 1000
 	config.Producer.Return.Successes = true
-	config.Producer.Retry.Max = 4
 	config.Producer.RequiredAcks = sarama.WaitForAll
-	config.Producer.Retry.Backoff = 0
+	config.Producer.Retry.Max = 10
+	config.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		return time.Duration(retries) * 500 * time.Millisecond
+	}
 	config.Producer.Idempotent = true
 	config.Version = sarama.V2_3_0_0
 	config.Net.MaxOpenRequests = 1
@@ -47,11 +51,6 @@ func main() {
 	pim := pim.NewContext(brokerList, config)
 	go pim.Start()
 	defer pim.Stop()
-	pim.AwaitLastOffset()
-
-	if *verbose {
-		log.Printf("context started up")
-	}
 
 	pim.ImportFile(*currentPath, *verbose)
 }
