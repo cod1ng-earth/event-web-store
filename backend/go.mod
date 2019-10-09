@@ -8,7 +8,6 @@ require (
 	github.com/emicklei/proto v1.6.15
 	github.com/golang/protobuf v1.3.2
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/openacid/low v0.1.9-0.20190905112804-e84e961934b4
 	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/satori/go.uuid v1.2.0
