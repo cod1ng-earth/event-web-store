@@ -181,7 +181,12 @@ func (c *aggregator) await(offset int64) {
 }
 
 func (c *aggregator) AwaitLastOffset() {
+	// TODO wait for brides to be up to date
 	c.await(c.batchOffset)
+}
+
+func (c *context) Healthy() bool {
+	return c.aggregator.offset >= c.aggregator.batchOffset
 }
 
 func (c *aggregator) updateLoop(writes <-chan *sarama.ConsumerMessage) {
@@ -207,7 +212,6 @@ func (c *aggregator) applyChange(msg *sarama.ConsumerMessage, m *model) {
 	}()
 
 	c.updateModel(msg, m)
-
 }
 
 func (c aggregator) updateModel(msg *sarama.ConsumerMessage, model *model) error {

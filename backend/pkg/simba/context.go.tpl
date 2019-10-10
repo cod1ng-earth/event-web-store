@@ -224,7 +224,12 @@ func (c *aggregator) await(offset int64) {
 }
 
 func (c *aggregator) AwaitLastOffset() {
+	// TODO wait for brides to be up to date
 	c.await(c.batchOffset)
+}
+
+func (c *context) Healthy() bool {
+	return c.aggregator.offset >= c.aggregator.batchOffset
 }
 
 func (c *aggregator) updateLoop(writes <-chan *sarama.ConsumerMessage) {
@@ -305,18 +310,7 @@ func (c *aggregator) applyChange(msg *sarama.ConsumerMessage, m *model) {
 	}()
 {{ end }}
 
-{{ if .Batch }}
-	if msg.Offset < c.batchOffset {
-		c.batchUpdateModel(msg, m)
-	} else if msg.Offset == c.batchOffset {
-		c.batchUpdateModel(msg, m)
-		batchFinalizeModel(m)
-	} else {
-		c.updateModel(msg, m)
-	}
-{{ else }}
 	c.updateModel(msg, m)
-{{ end }}
 }
 
 func (c aggregator) updateModel(msg *sarama.ConsumerMessage, model *model) error {
@@ -346,36 +340,6 @@ func (c aggregator) updateModel(msg *sarama.ConsumerMessage, model *model) error
 
 	return nil
 }
-
-{{ if .Batch }}
-func (c aggregator) batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := TopicMessage{}
-	err := proto.Unmarshal(msg.Value, &cc)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
-	}
-
-	switch x := cc.GetMessages().(type) {
-
-	{{ range .MessageNames }}
-	case *TopicMessage_{{ . | title }}:
-		fact := cc.Get{{ . | title }}()
-		err = batchUpdateModel{{ . | title }}(model, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-	{{ end }}
-
-	case nil:
-		panic(fmt.Sprintf("context message is empty"))
-
-	default:
-		panic(fmt.Sprintf("unexpected type %T in oneof", x))
-	}
-
-	return nil
-}
-{{ end }}
 
 {{ range .Bridges }}
 func (c *context) bridge{{ .Name | title }}() {

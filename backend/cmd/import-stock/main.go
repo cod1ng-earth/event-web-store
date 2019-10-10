@@ -32,7 +32,6 @@ func main() {
 	fulfilment := fulfilment.NewContext(brokerList, config)
 	go fulfilment.Start()
 	defer fulfilment.Stop()
-	fulfilment.AwaitLastOffset()
 
 	if *verbose {
 		log.Printf("context started up")

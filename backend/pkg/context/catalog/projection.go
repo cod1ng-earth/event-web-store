@@ -1,6 +1,6 @@
 //go:generate protoc --go_out=. api.proto
 //go:generate protoc --go_out=. topic.proto
-//go:generate ../../../cmd/dev-tools/simba/simba --lock=wait-free --batch --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim
+//go:generate ../../../cmd/dev-tools/simba/simba --lock=wait-free --bridge=github.com/cod1ng-earth/event-web-store/backend/pkg/context/pim
 //go:generate gofmt -s -w context.go
 
 package catalog
@@ -129,35 +129,4 @@ func remove(slice []*Product, i int) []*Product {
 
 func insert(slice []*Product, i int, p *Product) []*Product {
 	return append(slice[:i], append([]*Product{p}, slice[i:]...)...)
-}
-
-func batchUpdateModelProduct(m *model, offset int64, new *Product) error {
-	log.Printf("batchUpdateModelPimProduct %v", offset)
-
-	m.pimOffset = offset
-	if new.Disabled {
-		delete(m.products, new.Id)
-	} else {
-		m.products[new.Id] = new
-	}
-	return nil
-}
-
-func batchFinalizeModel(m *model) error {
-	log.Print("batchFinalizeModel")
-
-	m.sortedByUUID = nil
-	m.sortedByPrice = nil
-	m.sortedByName = nil
-
-	for _, v := range m.products {
-		m.sortedByUUID = append(m.sortedByUUID, v)
-		m.sortedByPrice = append(m.sortedByPrice, v)
-		m.sortedByName = append(m.sortedByName, v)
-	}
-	sort.Sort(m.sortedByUUID)
-	sort.Sort(m.sortedByPrice)
-	sort.Sort(m.sortedByName)
-
-	return nil
 }

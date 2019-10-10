@@ -15,6 +15,7 @@ type stock struct {
 
 func (c *context) ImportFile(path string, verbose bool) {
 
+	c.aggregator.AwaitLastOffset()
 	model, free := c.aggregator.read()
 	defer free()
 

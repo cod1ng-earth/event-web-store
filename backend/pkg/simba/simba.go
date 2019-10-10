@@ -15,7 +15,7 @@ import (
 	"github.com/emicklei/proto"
 )
 
-func UpdateCode(batch bool, readLock string, bridges []string) {
+func UpdateCode(readLock string, bridges []string) {
 
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -23,7 +23,7 @@ func UpdateCode(batch bool, readLock string, bridges []string) {
 	}
 	name := path.Base(currentDir)
 
-	desc := createContextDescription(name, batch, readLock, bridges)
+	desc := createContextDescription(name, readLock, bridges)
 	f, err := os.Create("context.go")
 	if err != nil {
 		log.Fatal(err)
@@ -45,11 +45,10 @@ func trimFirstRune(s string) string {
 	return s[i:]
 }
 
-func createContextDescription(name string, batch bool, readLock string, bridges []string) contextDescription {
+func createContextDescription(name string, readLock string, bridges []string) contextDescription {
 
 	desc := contextDescription{
 		Name:     name,
-		Batch:    batch,
 		ReadLock: readLock,
 	}
 

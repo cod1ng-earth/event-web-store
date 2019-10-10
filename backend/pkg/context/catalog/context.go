@@ -173,7 +173,12 @@ func (c *aggregator) await(offset int64) {
 }
 
 func (c *aggregator) AwaitLastOffset() {
+	// TODO wait for brides to be up to date
 	c.await(c.batchOffset)
+}
+
+func (c *context) Healthy() bool {
+	return c.aggregator.offset >= c.aggregator.batchOffset
 }
 
 func (c *aggregator) updateLoop(writes <-chan *sarama.ConsumerMessage) {
@@ -239,15 +244,7 @@ func (c *aggregator) applyChange(msg *sarama.ConsumerMessage, m *model) {
 
 	//	log.Printf("applying message with offset %v", msg.Offset)
 
-	if msg.Offset < c.batchOffset {
-		c.batchUpdateModel(msg, m)
-	} else if msg.Offset == c.batchOffset {
-		c.batchUpdateModel(msg, m)
-		batchFinalizeModel(m)
-	} else {
-		c.updateModel(msg, m)
-	}
-
+	c.updateModel(msg, m)
 }
 
 func (c aggregator) updateModel(msg *sarama.ConsumerMessage, model *model) error {
@@ -262,32 +259,6 @@ func (c aggregator) updateModel(msg *sarama.ConsumerMessage, model *model) error
 	case *TopicMessage_Product:
 		fact := cc.GetProduct()
 		err = updateModelProduct(model, msg.Offset, fact)
-		if err != nil {
-			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
-		}
-
-	case nil:
-		panic(fmt.Sprintf("context message is empty"))
-
-	default:
-		panic(fmt.Sprintf("unexpected type %T in oneof", x))
-	}
-
-	return nil
-}
-
-func (c aggregator) batchUpdateModel(msg *sarama.ConsumerMessage, model *model) error {
-	cc := TopicMessage{}
-	err := proto.Unmarshal(msg.Value, &cc)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kafka massage %s/%d: %v", Topic, msg.Offset, err)
-	}
-
-	switch x := cc.GetMessages().(type) {
-
-	case *TopicMessage_Product:
-		fact := cc.GetProduct()
-		err = batchUpdateModelProduct(model, msg.Offset, fact)
 		if err != nil {
 			return fmt.Errorf("failed to update kafka massage %s/%d: %v", Topic, msg.Offset, err)
 		}

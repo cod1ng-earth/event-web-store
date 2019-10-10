@@ -9,7 +9,6 @@ import (
 
 func main() {
 
-	batch := kingpin.Flag("batch", "use batch+finalize in addition to modify").Bool()
 	readLock := kingpin.Flag("lock", "lock to protect model: exclusive, parallel, wait-free").String()
 	bridges := kingpin.Flag("bridge", "connections to other contexts").Strings()
 	kingpin.Parse()
@@ -21,5 +20,5 @@ func main() {
 		log.Fatalf("readLock '%s' unknown", *readLock)
 	}
 
-	simba.UpdateCode(*batch, *readLock, *bridges)
+	simba.UpdateCode(*readLock, *bridges)
 }

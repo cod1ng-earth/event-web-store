@@ -29,23 +29,35 @@ func main() {
 	cat := catalog.NewContext(brokers, config)
 	go cat.Start()
 	defer cat.Stop()
-	cat.AwaitLastOffset()
 	http.HandleFunc("/product", cat.NewPDPHandler())
 	http.HandleFunc("/products", cat.NewCatalogHandler())
 
 	ckt := checkout.NewContext(brokers, config)
 	go ckt.Start()
 	defer ckt.Stop()
-	ckt.AwaitLastOffset()
 	http.HandleFunc("/cart", ckt.NewCartHandler())
 	http.HandleFunc("/orderCart", ckt.NewOrderHandler())
 
+	http.HandleFunc("/healthz", healthzHandler(cat.Healthy, ckt.Healthy))
 	http.Handle("/metrics", promhttp.Handler())
 
-	// TODO wait for brides to be up to date
-	// TODO wait for updater to be up to date
 	// TODO do not leak pim offset to frontend
 
 	log.Println("listening on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func healthzHandler(checks ...func() bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		healthy := true
+		for _, f := range checks {
+			if !f() {
+				healthy = false
+			}
+		}
+		if !healthy {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
 }

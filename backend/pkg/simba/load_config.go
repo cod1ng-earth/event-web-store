@@ -2,7 +2,6 @@ package simba
 
 type contextDescription struct {
 	Name         string
-	Batch        bool
 	ReadLock     string
 	MessageNames []string
 	Bridges      []subscriber
